@@ -627,7 +627,7 @@ def create_dataloader(data_type, batch_size = 3000, noise = 0.15, factor = 0.15,
             A = np.array([[0, k21], [k12, 0]])
             Ax = np.matmul(A, x)
             act_x = np.tanh(Ax)  # S**n/(S**n + Ax**n)
-            y = act_x - 0.5 * x
+            y = act_x - 2 * x
             return y
 
         deltat = 0.5
@@ -673,7 +673,7 @@ def create_dataloader(data_type, batch_size = 3000, noise = 0.15, factor = 0.15,
 
     if label == 'vector':
         if data_type == 'TS' or data_type == 'repr':
-            print('No change  applied to TS or repr data')
+            print('No change applied to TS or repr data')
             # y = np.array([(1., 0.) if label == 1 else (0., 1.) for label in y])
         else:
             y = np.array([(2., 0.) if label == 1 else (-2., 0.) for label in y])
