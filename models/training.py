@@ -18,7 +18,7 @@ import matplotlib.pyplot as plt
 
 from torch.utils import data as data
 from torch.utils.data import DataLoader, TensorDataset
-
+import matplotlib.pyplot as plt
 
 
 
@@ -616,18 +616,19 @@ def create_dataloader(data_type, batch_size = 3000, noise = 0.15, factor = 0.15,
         low, high = 0, 1  # range of uniform distribution
 
         X = torch.distributions.uniform.Uniform(low, high).sample(size)
-
+        plt.scatter(X[:,0],X[:,1],color = 'b')
+        plt.show()
         def toggleswitch(x, t):
             # p = (0.25,5,1,1)
             # (S,n,k21,k12) = p
             S = 0.25
             n = 5
-            k21 = 1
+            k21 = 2
             k12 = 1
             A = np.array([[0, k21], [k12, 0]])
-            Ax = np.matmul(A, x)
+            Ax = np.matmul(A, x-2)
             act_x = np.tanh(Ax)  # S**n/(S**n + Ax**n)
-            y = act_x - 2 * x
+            y = act_x - 0.15 * x
             return y
 
         deltat = 0.5
@@ -636,7 +637,9 @@ def create_dataloader(data_type, batch_size = 3000, noise = 0.15, factor = 0.15,
         # np.array((X[:, 0] > X[:, 1]).float())
         # y = y.to(torch.int64)
         X = torch.abs(X + noise * torch.randn(X.shape))
-
+        plt.scatter(X[:,0],X[:,1],color = 'dodgerblue')
+        plt.show()
+        
     elif data_type == 'repr':  # REPRESSILATOR
 
         size = [batch_size, 3]  # dimension of the pytorch tensor to be generated
@@ -681,8 +684,9 @@ def create_dataloader(data_type, batch_size = 3000, noise = 0.15, factor = 0.15,
     
     g = torch.Generator()
     g.manual_seed(random_state)
-    
-    X = StandardScaler().fit_transform(X)
+
+    if data_type != 'TS' and data_type != 'repr':
+        X = StandardScaler().fit_transform(X)
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=.2, random_state=random_state, shuffle = shuffle)
 
     X_train = torch.Tensor(X_train) # transform to torch tensor for dataloader
