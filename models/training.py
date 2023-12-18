@@ -619,16 +619,18 @@ def create_dataloader(data_type, batch_size = 3000, noise = 0.15, factor = 0.15,
         plt.scatter(X[:,0],X[:,1],color = 'b')
         plt.show()
         def toggleswitch(x, t):
-            # p = (0.25,5,1,1)
-            # (S,n,k21,k12) = p
-            S = 0.25
-            n = 5
-            k21 = 2
-            k12 = 1
-            A = np.array([[0, k21], [k12, 0]])
-            Ax = np.matmul(A, x-2)
-            act_x = np.tanh(Ax)  # S**n/(S**n + Ax**n)
-            y = act_x - 0.15 * x
+            gamma_x, ell_x, delta_x, theta_x = 1, 0.4, 1, 1
+            gamma_y, ell_y, delta_y, theta_y = 1, 0.4, 1, 1
+            
+            Gamma = np.array([gamma_x, gamma_y])
+            Ell = np.array([ell_x, ell_y])
+            Delta = np.array([delta_x, delta_y])
+            Theta = np.array([theta_x, theta_y])
+            Connection_matrix = np.array([[0, 1], [1, 0]])
+            
+            Ax = np.matmul(Connection_matrix, x - Theta)
+            act_x = Ell + np.multiply(Delta, np.tanh(Ax))
+            y = act_x - np.multiply(Gamma, x)
             return y
 
         deltat = 0.5
