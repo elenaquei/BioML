@@ -228,6 +228,8 @@ class doublebackTrainer():
             if self.verbose:
                 print("Epoch {}: {:.3f}".format(epoch + 1, avg_loss))
 
+        return avg_loss
+
     def _train_epoch(self, data_loader, epoch):
         epoch_loss = 0.
         epoch_loss_rob = 0.
@@ -614,25 +616,27 @@ def create_dataloader(data_type, batch_size = 3000, noise = 0.15, factor = 0.15,
     elif data_type == 'TS':
         print('check')
         size = [batch_size, 2]  # dimension of the pytorch tensor to be generated
-        low, high = 0, 1  # range of uniform distribution
+        low, high = 0, 5  # range of uniform distribution
 
         X = torch.distributions.uniform.Uniform(low, high).sample(size)
-        plt.scatter(X[:,0],X[:,1],color = 'b')
-        plt.show()
+        #plt.scatter(X[:,0],X[:,1],color = 'b')
+        #plt.show()
         def toggleswitch(x, t):
-            gamma_x, ell_x, delta_x, theta_x = 1, 0.4, 1, 1
-            gamma_y, ell_y, delta_y, theta_y = 1, 0.4, 1, 1
+            gamma_x, ell_x, delta_x, theta_x = 1, 0.4, 4, 2
+            gamma_y, ell_y, delta_y, theta_y = 1, 0.4, 4, 2
             
+            hill_func = lambda x: ell_x + delta_x/2 * (np.tanh( theta_x - x) + 1)
+                    
             Gamma = np.array([gamma_x, gamma_y])
             Ell = np.array([ell_x, ell_y])
             Delta = np.array([delta_x, delta_y])
             Theta = np.array([theta_x, theta_y])
             Connection_matrix = np.array([[0, 1], [1, 0]])
-            
-            Ax = np.matmul(Connection_matrix, x - Theta)
-            act_x = Ell + np.multiply(Delta, np.tanh(Ax))
-            y = act_x - np.multiply(Gamma, x)
+
+            Act = Ell + np.multiply(Delta/2, np.tanh( Theta - np.matmul(Connection_matrix, x)) + 1 )
+            y = Act - np.multiply(Gamma, x)
             return y
+
         
         y = np.array([scipy.integrate.odeint(toggleswitch, X[i, :], [0, deltat])[-1, :] for i in range(batch_size)])
 
@@ -640,6 +644,7 @@ def create_dataloader(data_type, batch_size = 3000, noise = 0.15, factor = 0.15,
         # y = y.to(torch.int64)
         X = torch.abs(X + noise * torch.randn(X.shape))
         plt.scatter(X[:,0],X[:,1],color = 'dodgerblue')
+        plt.scatter(y[:,0],y[:,1],color= 'red')
         plt.show()
         
     elif data_type == 'repr':  # REPRESSILATOR
@@ -724,14 +729,14 @@ def create_dataloader(data_type, batch_size = 3000, noise = 0.15, factor = 0.15,
     else:
         data_0 = X_train[y_train[:,0] > 0]
         data_1 = X_train[y_train[:,0] < 0]
-    fig = plt.figure(figsize = (5,5), dpi = 100)
-    plt.scatter(data_0[:, 0], data_0[:, 1], edgecolor="#333",  alpha = 0.5)
-    plt.scatter(data_1[:, 0], data_1[:, 1], edgecolor="#333", alpha = 0.5)
-    plt.xlim(plotlim)
-    plt.ylim(plotlim)
-    ax = plt.gca()
-    ax.set_aspect('equal')
-    plt.savefig('trainingset.png', bbox_inches='tight', dpi=300, format='png', facecolor = 'white')
-    plt.show()
+    #fig = plt.figure(figsize = (5,5), dpi = 100)
+    #plt.scatter(data_0[:, 0], data_0[:, 1], edgecolor="#333",  alpha = 0.5)
+    #plt.scatter(data_1[:, 0], data_1[:, 1], edgecolor="#333", alpha = 0.5)
+    #plt.xlim(plotlim)
+    #plt.ylim(plotlim)
+    #ax = plt.gca()
+    #ax.set_aspect('equal')
+    #plt.savefig('trainingset.png', bbox_inches='tight', dpi=300, format='png', facecolor = 'white')
+    #plt.show()
     
     return train, test
