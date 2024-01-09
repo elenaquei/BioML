@@ -86,7 +86,7 @@ class Dynamics(nn.Module):
         self.architecture = architectures[architecture]
         self.T = T
         self.time_steps = time_steps
-        
+        print(self.architecture)
         if self.architecture > 0:
             ##-- R^{d_aug} -> R^{d_hid} layer -- 
             blocks1 = [nn.Linear(self.input_dim, hidden_dim) for _ in range(self.time_steps)]
@@ -127,11 +127,11 @@ class Dynamics(nn.Module):
             
             #x.matmul(w1_t.t()) is the same as torch.matmul(w1_t,x) simple matrix-vector multiplication
 
-            #Domenec Test
+            #Domenec Test         
             out1 = torch.sqrt(self.non_linearity(x.matmul(w1_t.t())+torch.ones(self.hidden_dim) + b1_t) + 1e-6*torch.ones(self.hidden_dim))-torch.sqrt(1e-6*torch.ones(self.hidden_dim))
             out2 = torch.sqrt(self.non_linearity(-x.matmul(w1_t.t())+torch.ones(self.hidden_dim) + b1_t) + 1e-6*torch.ones(self.hidden_dim))-torch.sqrt(1e-6*torch.ones(self.hidden_dim))
             out = torch.min(out1, out2)
-            out = out.matmul(w2_t.t())
+            out = out.matmul(w2_t.t()) + b2_t
         return out
 
 

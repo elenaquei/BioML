@@ -223,12 +223,14 @@ class doublebackTrainer():
         # writer = SummaryWriter(logging_dir)
 
     def train(self, data_loader, num_epochs):
+        loss_vec = []
         for epoch in range(num_epochs):
             avg_loss = self._train_epoch(data_loader, epoch)
+            loss_vec.append(avg_loss)
             if self.verbose:
                 print("Epoch {}: {:.3f}".format(epoch + 1, avg_loss))
 
-        return avg_loss
+        return avg_loss, loss_vec
 
     def _train_epoch(self, data_loader, epoch):
         epoch_loss = 0.
