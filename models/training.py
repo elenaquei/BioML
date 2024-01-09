@@ -591,7 +591,7 @@ class epsTrainer():
                                              ## Classical empirical risk minimization
                 
 
-def create_dataloader(data_type, batch_size = 3000, noise = 0.15, factor = 0.15, random_state = 1, shuffle = True, plotlim = [-2, 2], label = 'scalar'):
+def create_dataloader(data_type, batch_size = 3000, noise = 0.15, factor = 0.15, random_state = 1, shuffle = True, plotlim = [-2, 2], label = 'scalar',deltat=0.5):
     label_types = ['scalar', 'vector']
     if label not in label_types:
         raise ValueError("Invalid label type. Expected one of: %s" % label_types)
@@ -612,6 +612,7 @@ def create_dataloader(data_type, batch_size = 3000, noise = 0.15, factor = 0.15,
         X, y = make_moons(batch_size, noise = noise, shuffle = shuffle , random_state = random_state)
     
     elif data_type == 'TS':
+        print('check')
         size = [batch_size, 2]  # dimension of the pytorch tensor to be generated
         low, high = 0, 1  # range of uniform distribution
 
@@ -632,8 +633,7 @@ def create_dataloader(data_type, batch_size = 3000, noise = 0.15, factor = 0.15,
             act_x = Ell + np.multiply(Delta, np.tanh(Ax))
             y = act_x - np.multiply(Gamma, x)
             return y
-
-        deltat = 0.5
+        
         y = np.array([scipy.integrate.odeint(toggleswitch, X[i, :], [0, deltat])[-1, :] for i in range(batch_size)])
 
         # np.array((X[:, 0] > X[:, 1]).float())
