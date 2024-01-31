@@ -223,7 +223,6 @@ def create_dataloader(data_type, batch_size = 3000, noise = 0.15, factor = 0.15,
         raise ValueError("Invalid label type. Expected one of: %s" % label_types)
     
     if data_type == 'TS':
-        print('check')
         size = [batch_size, 2]  # dimension of the pytorch tensor to be generated
         low, high = 0, 5  # range of uniform distribution
 

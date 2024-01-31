@@ -125,7 +125,6 @@ class Dynamics(nn.Module):
             b1_t = self.fc1_time[k].bias
             w2_t = self.fc3_time[k].weight
             b2_t = self.fc3_time[k].bias
-<<<<<<< HEAD
             gam = self.gamma[k].bias
             out = self.non_linearity(x.matmul(w1_t.t()) + b1_t)
             #out = 2*self.non_linearity(x.matmul(w1_t.t()) + 2)
@@ -135,19 +134,6 @@ class Dynamics(nn.Module):
             out = out - gam*x
             #out = out - x
 
-=======
-            out = self.non_linearity(x.matmul(w1_t.t()) + b1_t)
-            out = out.matmul(w2_t.t()) + b2_t
-            out = out - x
-            
-            #x.matmul(w1_t.t()) is the same as torch.matmul(w1_t,x) simple matrix-vector multiplication
-
-            #Domenec Test         
-            # out1 = torch.sqrt(self.non_linearity(x.matmul(w1_t.t())+torch.ones(self.hidden_dim) + b1_t) + 1e-6*torch.ones(self.hidden_dim))-torch.sqrt(1e-6*torch.ones(self.hidden_dim))
-            # out2 = torch.sqrt(self.non_linearity(-x.matmul(w1_t.t())+torch.ones(self.hidden_dim) + b1_t) + 1e-6*torch.ones(self.hidden_dim))-torch.sqrt(1e-6*torch.ones(self.hidden_dim))
-            # out = torch.min(out1, out2)
-            # out = out.matmul(w2_t.t()) + b2_t
->>>>>>> e51168f4f0eb81febd32c8c864d21f49f75adf85
         return out
 
 class Semiflow(nn.Module):  # this should allow to calculate the flow for dot(x) = f(u,x) AND dot(p) = -Dxf(u,x)p
@@ -249,9 +235,5 @@ class NeuralODE(nn.Module):
         
         if return_features:
             return features, pred
-<<<<<<< HEAD
         return pred, self.proj_traj
     
-=======
-        return pred, self.proj_traj
->>>>>>> e51168f4f0eb81febd32c8c864d21f49f75adf85
