@@ -264,7 +264,7 @@ def create_dataloader(data_type, batch_size=3000, noise=0.15, factor=0.15, rando
         size = [batch_size, 3]  # dimension of the pytorch tensor to be generated
         low, high = plotlim  # range of uniform distribution
 
-        X = torch.distributions.uniform.Uniform(low, high).sample(size)
+        X = np.array(torch.distributions.uniform.Uniform(low, high).sample(size))
 
         def repressilator(xyz, t):
             x, y, z = xyz[0], xyz[1], xyz[2]
@@ -276,11 +276,15 @@ def create_dataloader(data_type, batch_size=3000, noise=0.15, factor=0.15, rando
             return np.array([x_dot, y_dot, z_dot])
 
         deltat = 0.5
+        # forward the random points in time a lot
+        small_sample_size = int(np.floor(batch_size*0.75))
+        X[:,:small_sample_size] = np.array([scipy.integrate.odeint(repressilator, 
+                                                                  X[i, :small_sample_size], [0, 100*deltat])[-1, :] for i in range(batch_size)])
         y = np.array([scipy.integrate.odeint(repressilator, X[i, :], [0, deltat])[-1, :] for i in range(batch_size)])
 
         # np.array((X[:, 0] > X[:, 1]).float())
         # y = y.to(torch.int64)
-        X = torch.abs(X + noise * torch.randn(X.shape))
+        X = torch.abs(torch.from_numpy(X) + noise * torch.randn(X.shape))
 
     elif data_type == 'xor':
         X = torch.randint(low=0, high=2, size=(batch_size, 2), dtype=torch.float32)
@@ -338,12 +342,21 @@ def create_dataloader(data_type, batch_size=3000, noise=0.15, factor=0.15, rando
         data_0 = X_train[y_train[:, 0] > 0]
         data_1 = X_train[y_train[:, 0] < 0]
     fig = plt.figure(figsize=(5, 5), dpi=100)
-    plt.scatter(data_0[:, 0], data_0[:, 1], edgecolor="#333", alpha=0.5)
-    plt.scatter(data_1[:, 0], data_1[:, 1], edgecolor="#333", alpha=0.5)
-    plt.xlim(plotlim)
-    plt.ylim(plotlim)
-    ax = plt.gca()
-    ax.set_aspect('equal')
+    
+    if data_type == 'repr':
+        ax = fig.add_subplot(projection='3d')
+        ax.scatter(X_train[:, 0], X_train[:, 1], X_train[:, 2], edgecolor="#333", alpha=0.5)
+        ax.scatter(y_train[:, 0], y_train[:, 1], y_train[:, 2], edgecolor="#333", alpha=0.5)
+        #plt.xlim(plotlim)
+        #plt.ylim(plotlim)
+        #plt.zlim(plotlim)
+    else:
+        plt.scatter(data_0[:, 0], data_0[:, 1], edgecolor="#333", alpha=0.5)
+        plt.scatter(data_1[:, 0], data_1[:, 1], edgecolor="#333", alpha=0.5)
+        plt.xlim(plotlim)
+        plt.ylim(plotlim)
+        ax = plt.gca()
+        ax.set_aspect('equal')
     plt.savefig('trainingset.png', bbox_inches='tight', dpi=300, format='png', facecolor='white')
     plt.show()
 

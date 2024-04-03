@@ -65,6 +65,8 @@ problem = possible_problem[chosen_problem]
 # %%
 if problem == 'moons':
     plotlim = [-2, 3]
+elif problem == 'repr':
+    plotlim = [0, 60]
 else:
     plotlim = [0, 2]
 subfolder = str('traj_'+problem)
@@ -97,8 +99,6 @@ for X_viz, y_viz in dataloader:
     plt.show()
     break
 
-# %%
-
 # %% [markdown]
 # # nODE parameter choices
 
@@ -120,7 +120,7 @@ turnpike = False
 # architecture = 'inside' 'outside'
 non_linearity = 'tanh'
 architecture = 'inside'
-
+architectures = {'inside': -1, 'outside': 0, 'bottleneck': 1}
 # number of optimization runs in which the dataset is used for gradient decent
 num_epochs = 80 
 
@@ -160,11 +160,17 @@ b = anode.linear_layer.bias
 dt = anode.T/anode.time_steps   #here was no -1 before which does not fit with adjoint solver otherwise
 k = int(T/dt)
 
+architectures = {'inside': -1, 'outside': 0, 'bottleneck': 1}
+architecture_index = architectures[architecture]
+
 for i in range(k):
     w_t = anode.flow.dynamics.fc2_time[0].weight
     b_t = anode.flow.dynamics.fc2_time[0].bias
     print('W[',i,'] =', w.detach().numpy())
     print('b[',i,'] =',b.detach().numpy())
+    if architecture_index > 0:
+        gam = anode.flow.dynamics.gamma[0].bias
+        print('W[',i,'] =', gam.detach().numpy())
 
 # %% [markdown]
 # Showing the classification level sets, only makes sense in 2 dimensions
@@ -189,8 +195,8 @@ if data_dim == 2:
     display(img1)
 
 
-# %%
-# Dynamical insight on the repressilator
+# %% [markdown]
+# # Dynamical insight on the repressilator
 
 # %%
 def repressilator(xyz, t):
@@ -217,6 +223,8 @@ for i in range(10):
     y = scipy.integrate.odeint(repressilator,x,times)
     ax.plot(y[:,0], y[:,1], y[:,2])
 
-# %%
-
-# %%
+# %% [markdown]
+# ## TO DO
+#
+# 1. plot the orbits of the neuralODE (use trajectory maybe?)
+# 2. 

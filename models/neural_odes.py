@@ -130,20 +130,14 @@ class Dynamics(nn.Module):
             b1_t = self.fc1_time[k].bias
             w2_t = self.fc3_time[k].weight
             b2_t = self.fc3_time[k].bias
-            # out = self.non_linearity(x.matmul(w1_t.t()) + b1_t)
-            # out = out.matmul(w2_t.t()) + b2_t
+            out = self.non_linearity(x.matmul(w1_t.t()) + b1_t)
+            out = out.matmul(w2_t.t()) + b2_t
 
             # x.matmul(w1_t.t()) is the same as torch.matmul(w1_t,x) simple matrix-vector multiplication
 
             # following lines add the linear layer as a gamma
             gam = self.gamma[k].bias
-            out = self.non_linearity(x.matmul(w1_t.t()) + b1_t)
-            # out = 2*self.non_linearity(x.matmul(w1_t.t()) + 2)
-            # out = 2*self.non_linearity(x.matmul(torch.tensor([[0.0,-1.0],[-1.0,0.0]])) + 2)
-            out = out.matmul(w2_t.t()) + b2_t
-            # out = out + 2
             out = out - gam * x
-            # out = out - x
 
         return out
 
@@ -241,7 +235,7 @@ class NeuralODE(nn.Module):
         self.cross_entropy = cross_entropy
         self.fixed_projector = fixed_projector
         dynamics = Dynamics(device, data_dim, hidden_dim, augment_dim, non_linearity, architecture, self.T,
-                                self.time_steps)
+                            self.time_steps)
 
         self.flow = Semiflow(device, dynamics, tol, adjoint, T, time_steps)  # , self.adj_flow
         self.linear_layer = nn.Linear(self.flow.dynamics.input_dim,
@@ -268,7 +262,6 @@ class NeuralODE(nn.Module):
             self.proj_traj = self.flow.trajectory(x, self.time_steps)
             # self.proj_traj = self.linear_layer(self.proj_traj)
 
-
         else:
             self.traj = self.flow.trajectory(x, self.time_steps)
             pred = self.linear_layer(features)
@@ -281,16 +274,3 @@ class NeuralODE(nn.Module):
             return features, pred
         return pred, self.proj_traj
 
-
-def grad_loss_inputs(model, data_inputs, data_labels, loss_module):
-    data_inputs.requires_grad = True
-
-    data_inputs_grad = torch.tensor(0.)
-
-    preds, _ = model(data_inputs)
-
-    loss = loss_module(preds, data_labels)
-
-    data_inputs_grad = torch.autograd.grad(loss, data_inputs)[0]
-    data_inputs.requires_grad = False
-    return data_inputs_grad
