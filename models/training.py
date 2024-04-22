@@ -69,8 +69,6 @@ class doublebackTrainer():
                           'epoch_loss_history': [], 'epoch_loss_rob_history': [], 'epoch_acc_history': []}
         self.buffer = {'loss': [], 'loss_rob': [], 'accuracy': []}
         self.is_resnet = hasattr(self.model, 'num_layers')
-        self.eps = eps
-        self.eps_comp = eps_comp
         self.l2_factor = l2_factor
         self.db_type = db_type
 
@@ -88,10 +86,6 @@ class doublebackTrainer():
         epoch_loss_rob = 0.
         epoch_acc = 0.
 
-        # If eps = 0, we have standard training, if eps_comp is greater 0, we have standard training but record the gradient term as comparison
-        # if eps > 0 we activate robust training and record the gradient term
-        eps_eff = max(self.eps_comp, self.eps)
-        # print(eps_eff)
         loss_max = torch.tensor(0.)
 
         x_batch_grad = torch.tensor(0.).to(self.device)
@@ -103,64 +97,32 @@ class doublebackTrainer():
             x_batch = x_batch.to(self.device)
             y_batch = y_batch.to(self.device)
 
-            if eps_eff > 0.:  # !!!!
-                x_batch.requires_grad = True  # i need this for calculating the gradient term
-
-            if not self.is_resnet:
-                y_pred, traj = self.model(x_batch)
-                time_steps = self.model.time_steps
-                T = self.model.T
-                dt = T / time_steps
-            else:
-                # In ResNet, dt=1=T/N_layers.
-                y_pred, traj, _ = self.model(x_batch)
-                time_steps = self.model.num_layers
-                T = time_steps
-                dt = 1
-
-                ## Classical empirical risk minimization
-            loss = self.loss_func(y_pred, y_batch)
-            loss_rob = torch.tensor(0.)
-            # v = torch.tensor([0,1.])
-            # adding perturbed trajectories
-
+            y_pred, traj = self.model(x_batch)
+            time_steps = self.model.time_steps
+            T = self.model.T
+            dt = T / time_steps
+        
+            ## Classical empirical risk minimization
+            
+            #loss = self.loss_func(y_pred, y_batch)
+            loss = 0
+            for i in range(2):
+                x_i = x_batch[i]
+                y_i = y_batch[i]
+                y_pred = self.model(x_i)[0]
+                loss += torch.sum((y_pred - y_i)**2)
+                # loss_trainer += self.loss_func(y_pred, y_i)
+            
             if self.l2_factor > 0:
                 for param in self.model.parameters():
                     l2_regularization = param.norm()
                     loss += self.l2_factor * l2_regularization
 
-            if eps_eff > 0.:
-                x_batch_grad = torch.autograd.grad(loss, x_batch, create_graph=True, retain_graph=True)[
-                    0]  # not sure if retrain_graph is necessary here
-
-                if self.db_type == 'l1':
-                    loss_rob = x_batch_grad.abs().sum()  # this corresponds to linfty defense
-
-                if self.db_type == 'l2':
-                    loss_rob = x_batch_grad.norm()  # this corresponds to l2 defense
-
-                loss_rob = eps_eff * loss_rob
-
-            if (self.eps > 0.) and (
-                    self.eps == eps_eff):  # robust loss term is active or is logged + make sure there is no confusing between epsilon of logging and training epsilon
-                loss = (1 - self.eps) * loss + loss_rob
-                # print(f'{loss=}')
-                # loss = (1-eps) * loss + eps * adj_term #was 0.005 before
             loss.backward()
             self.optimizer.step()
 
-            if self.cross_entropy:
-                epoch_loss += loss.item()
-                epoch_loss_rob += loss_rob.item()
-                m = nn.Softmax(dim=1)
-                # print(y_pred.size())
-                softpred = m(y_pred)
-                softpred = torch.argmax(softpred, 1)
-                epoch_acc += (softpred == y_batch).sum().item() / (y_batch.size(0))
-            else:
-                epoch_loss += loss.item()
-                epoch_loss_rob += loss_rob.item()
-
+            epoch_loss += loss.item()
+            
             if i % self.print_freq == 0:
                 if self.verbose:
                     print("\nIteration {}/{}".format(i, len(data_loader)))
@@ -174,7 +136,6 @@ class doublebackTrainer():
                         print("Loss: {:.3f}".format(loss))
 
             self.buffer['loss'].append(loss.item())
-            self.buffer['loss_rob'].append(loss_rob.item())
 
             if not self.fixed_projector and self.cross_entropy:
                 self.buffer['accuracy'].append((softpred == y_batch).sum().item() / (y_batch.size(0)))
@@ -182,13 +143,11 @@ class doublebackTrainer():
             # At every record_freq iteration, record mean loss and clear buffer
             if self.steps % self.record_freq == 0:
                 self.histories['loss_history'].append(mean(self.buffer['loss']))
-                self.histories['loss_rob_history'].append(mean(self.buffer['loss_rob']))
                 if not self.fixed_projector and self.cross_entropy:
                     self.histories['acc_history'].append(mean(self.buffer['accuracy']))
 
                 # Clear buffer
                 self.buffer['loss'] = []
-                self.buffer['loss_rob'] = []
                 self.buffer['accuracy'] = []
 
                 # Save information in directory
@@ -201,9 +160,7 @@ class doublebackTrainer():
 
         # Record epoch mean information
         self.histories['epoch_loss_history'].append(epoch_loss / len(data_loader))
-        self.histories['epoch_loss_rob_history'].append(epoch_loss_rob / len(data_loader))
 
-        # self.histories['ep']
         if not self.fixed_projector:
             self.histories['epoch_acc_history'].append(epoch_acc / len(data_loader))
 
@@ -256,8 +213,29 @@ def create_dataloader(data_type, batch_size=3000, noise=0.15, factor=0.15, rando
         # np.array((X[:, 0] > X[:, 1]).float())
         # y = y.to(torch.int64)
         X = torch.abs(X + noise * torch.randn(X.shape))
+    
+    elif data_type == 'restrictedTS':
+        if batch_size > 2:
+            stopHere
+        
+        size = [batch_size, 2]  # dimension of the pytorch tensor to be generated
+        low, high = 0, 1  # range of uniform distribution
 
+        X = torch.Tensor([[1,2],[4.,3.]])
 
+        def toggleswitch(x, t):
+            W1 = np.array([[0, -1], [-1, 0]])
+            b1 = np.array([2.,2.])
+            interior = np.matmul(W1, x) + b1
+            act_x = np.tanh(interior)  # S**n/(S**n + Ax**n)
+            W2 = np.array([[2.,0],[0.,2.]])
+            b2 = np.array([2.,2.])
+            exterior = np.matmul(W2, act_x) + b2
+            y = exterior - x
+            return y
+
+        deltat = 1
+        y = np.array([scipy.integrate.odeint(toggleswitch, X[i, :], [0, deltat])[-1, :] for i in range(batch_size)])
 
     elif data_type == 'repr':  # REPRESSILATOR
 
@@ -298,7 +276,7 @@ def create_dataloader(data_type, batch_size=3000, noise=0.15, factor=0.15, rando
         return None, None
 
     if label == 'vector':
-        if data_type == 'TS' or data_type == 'repr':
+        if data_type == 'TS' or data_type == 'repr' or data_type == 'restrictedTS':
             print('No change  applied to TS or repr data')
             # y = np.array([(1., 0.) if label == 1 else (0., 1.) for label in y])
         else:
@@ -309,6 +287,9 @@ def create_dataloader(data_type, batch_size=3000, noise=0.15, factor=0.15, rando
 
     # X = StandardScaler().fit_transform(X)
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=.2, random_state=random_state, shuffle=shuffle)
+    if data_type == 'restrictedTS':
+        X_test, X_train = X, X
+        y_train, y_test = y, y
 
     X_train = torch.Tensor(X_train)  # transform to torch tensor for dataloader
     y_train = torch.Tensor(y_train)  # transform to torch tensor for dataloader

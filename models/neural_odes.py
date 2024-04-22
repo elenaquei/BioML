@@ -65,7 +65,7 @@ activations = {'tanh': nn.Tanh(),
                'leakyrelu': nn.LeakyReLU(negative_slope=0.25, inplace=True),
                'tanh_prime': tanh_prime
                }
-architectures = {'inside': -1, 'outside': 0, 'bottleneck': 1}
+architectures = {'inside': -1, 'outside': 0, 'bottleneck': 1, 'restricted': 2}
 
 
 class Dynamics(nn.Module):
@@ -91,6 +91,11 @@ class Dynamics(nn.Module):
         self.T = T
         self.time_steps = time_steps
 
+        if self.architecture == 2: # restricted for testing purposes
+            blocks1 = [nn.Linear(self.input_dim, hidden_dim) for _ in range(self.time_steps)]
+            self.fc1_time = nn.Sequential(*blocks1)
+            return
+        
         if self.architecture > 0:
             ##-- R^{d_aug} -> R^{d_hid} layer --
             blocks1 = [nn.Linear(self.input_dim, hidden_dim) for _ in range(self.time_steps)]
@@ -106,7 +111,7 @@ class Dynamics(nn.Module):
             blocks = [nn.Linear(hidden_dim, hidden_dim) for _ in range(self.time_steps)]
             self.fc2_time = nn.Sequential(*blocks)
 
-    def forward(self, t, x):
+    def forward(self, t, x, verbose = False):
         """
         The output of the class -> f(x(t), u(t)).
         f(x(t), u(t)) = f(x,u^k)
@@ -114,10 +119,24 @@ class Dynamics(nn.Module):
         dt = self.T / self.time_steps  # here was no -1 before which does not fit with adjoint solver otherwise
         k = int(t / dt)
 
+        if verbose:
+            print('x=', x, ' t = ', t)
+
         if k > self.T - 1:
-            warn('Extending the dynamics')
+            # warn('Extending the dynamics')
             k = self.T - 1  # here, the dynamics is defined to "continue" with the latest values
 
+        if self.architecture == 2: # restricted dynamics for testing
+            w1_t = self.fc1_time[k].weight
+            b1_t =  nn.Parameter(torch.Tensor([2., 2.]), requires_grad=False)
+            # nn.Parameter(weights2, requires_grad=False)
+            out = self.non_linearity(x.matmul(w1_t.t()) + b1_t)
+            w2_t =  nn.Parameter(torch.Tensor([[2.,0],[0,2.]]), requires_grad=False)
+            b2_t =  nn.Parameter(torch.Tensor([2.,2.]), requires_grad=False)
+            out = out.matmul(w2_t.t()) + b2_t
+            out = out - x
+            return out
+        
         if self.architecture < 1:
             w_t = self.fc2_time[k].weight
             b_t = self.fc2_time[k].bias
@@ -184,8 +203,8 @@ class Semiflow(nn.Module):  # this should allow to calculate the flow for dot(x)
             # out = odeint_adjoint(self.dynamics, x_aug, integration_time, method='dopri5', rtol = 0.1, atol = 0.1)
 
         else:
-            out = odeint(self.dynamics, x_aug, integration_time, method='euler', options={'step_size': dt})
-            # out = odeint(self.dynamics, x_aug, integration_time, method='dopri5', rtol = 0.1, atol = 0.1)
+            # ßout = odeint(self.dynamics, x_aug, integration_time, method='euler', options={'step_size': dt})
+            out = odeint(self.dynamics, x_aug, integration_time, method='dopri5', rtol = 0.001, atol = 0.001)
 
             # i need to put the out into the odeint for the adj_out
             # adj_out = odeint(self.adj_dynamics, torch.eye(x.shape[0]), torch.flip(integration_time,[0]), method='euler', options={'step_size': dt}) #this is new for the adjoint
@@ -238,39 +257,22 @@ class NeuralODE(nn.Module):
                             self.time_steps)
 
         self.flow = Semiflow(device, dynamics, tol, adjoint, T, time_steps)  # , self.adj_flow
-        self.linear_layer = nn.Linear(self.flow.dynamics.input_dim,
-                                      self.output_dim)
-        self.non_linearity = nn.Tanh()  # not really sure why this is here
+        #self.linear_layer = nn.Linear(self.flow.dynamics.input_dim,
+        #                              self.output_dim)
+        #self.non_linearity = nn.Tanh()  # not really sure why this is here
 
     def forward(self, x, return_features=False):
 
         features = self.flow(x)
 
-        if self.fixed_projector:  # currently fixed_projector = fp
-            # import pickle
-            # with open('text.txt', 'rb') as fp:
-            #     projector = pickle.load(fp)
-            #     print(projector)
-
-            # pred = features.matmul(projector[-2].t()) + projector[-1]
-            # pred = self.non_linearity(pred)
-            # self.proj_traj = self.flow.trajectory(x, self.time_steps)
-            # self.proj_traj = self.linear_layer(self.proj_traj)
-
-            pred = features
-            pred = self.non_linearity(pred)
-            self.proj_traj = self.flow.trajectory(x, self.time_steps)
-            # self.proj_traj = self.linear_layer(self.proj_traj)
-
-        else:
-            self.traj = self.flow.trajectory(x, self.time_steps)
-            pred = self.linear_layer(features)
-            self.proj_traj = self.linear_layer(self.traj)
-            if not self.cross_entropy:
-                pred = self.non_linearity(pred)
-                self.proj_traj = self.non_linearity(self.proj_traj)
+        self.traj = self.flow.trajectory(x, self.time_steps)
+        #pred = self.linear_layer(features)
+        #self.proj_traj = self.linear_layer(self.traj)
+        #if not self.cross_entropy:
+        #    pred = self.non_linearity(pred)
+        #    self.proj_traj = self.non_linearity(self.proj_traj)
 
         if return_features:
-            return features, pred
-        return pred, self.proj_traj
+            return features, self.traj
+        return features, self.traj
 

@@ -172,6 +172,11 @@ for i in range(k):
         gam = anode.flow.dynamics.gamma[0].bias
         print('W[',i,'] =', gam.detach().numpy())
 
+# %%
+trainer_anode.histories
+
+# %%
+
 # %% [markdown]
 # Showing the classification level sets, only makes sense in 2 dimensions
 
@@ -223,8 +228,30 @@ for i in range(10):
     y = scipy.integrate.odeint(repressilator,x,times)
     ax.plot(y[:,0], y[:,1], y[:,2])
 
+
 # %% [markdown]
 # ## TO DO
 #
 # 1. plot the orbits of the neuralODE (use trajectory maybe?)
-# 2. 
+# 2. add network structure to training
+#    
+
+# %%
+def neural_repressilator(xyz, t):
+    x_dot = anode.flow.dynamics.forward(1.0, torch.from_numpy(xyz).double, verbose = True)
+    return np.array(x_dot)
+
+
+# %%
+neural_repressilator((np.array([2.1,3.,4.])), 1.0)
+
+# %%
+a = np.array([2.1,3.,4.]).astype(np.double)
+
+# %%
+a = torch.from_numpy(a)
+
+# %%
+a.double()
+
+# %%
