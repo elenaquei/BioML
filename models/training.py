@@ -316,30 +316,6 @@ def create_dataloader(data_type, batch_size=3000, noise=0.15, factor=0.15, rando
 
     train = DataLoader(train_data, batch_size=64, shuffle=shuffle, generator=g)
     test = DataLoader(test_data, batch_size=256, shuffle=shuffle, generator=g)  # 128 before
-    if label == 'scalar':
-        data_0 = X_train[y_train == 0]
-        data_1 = X_train[y_train == 1]
-    else:
-        data_0 = X_train[y_train[:, 0] > 0]
-        data_1 = X_train[y_train[:, 0] < 0]
-    fig = plt.figure(figsize=(5, 5), dpi=100)
-    
-    if data_type == 'repr':
-        ax = fig.add_subplot(projection='3d')
-        ax.scatter(X_train[:, 0], X_train[:, 1], X_train[:, 2], edgecolor="#333", alpha=0.5)
-        ax.scatter(y_train[:, 0], y_train[:, 1], y_train[:, 2], edgecolor="#333", alpha=0.5)
-        #plt.xlim(plotlim)
-        #plt.ylim(plotlim)
-        #plt.zlim(plotlim)
-    else:
-        plt.scatter(data_0[:, 0], data_0[:, 1], edgecolor="#333", alpha=0.5)
-        plt.scatter(data_1[:, 0], data_1[:, 1], edgecolor="#333", alpha=0.5)
-        plt.xlim(plotlim)
-        plt.ylim(plotlim)
-        ax = plt.gca()
-        ax.set_aspect('equal')
-    plt.savefig('trainingset.png', bbox_inches='tight', dpi=300, format='png', facecolor='white')
-    plt.show()
 
     return train, test
 
