@@ -103,13 +103,14 @@ class Dynamics(nn.Module):
             ##-- R^{d_hid} -> R^{d_aug} layer --
             blocks3 = [nn.Linear(hidden_dim, self.input_dim) for _ in range(self.time_steps)]
             self.fc3_time = nn.Sequential(*blocks3)
-            print("Added final linear layer as an approximation of gamma")
-            blocks_gamma = [nn.Linear(self.input_dim, hidden_dim) for _ in range(self.time_steps)]
-            self.gamma = nn.Sequential(*blocks_gamma)
         else:
             ##-- R^{d_hid} -> R^{d_hid} layer --
             blocks = [nn.Linear(hidden_dim, hidden_dim) for _ in range(self.time_steps)]
             self.fc2_time = nn.Sequential(*blocks)
+
+        # print("Added final linear layer as an approximation of gamma")
+        # blocks_gamma = [nn.Linear(self.input_dim, hidden_dim) for _ in range(self.time_steps)]
+        # self.gamma = nn.Sequential(*blocks_gamma)
 
     def forward(self, t, x, verbose = False):
         """
@@ -128,11 +129,11 @@ class Dynamics(nn.Module):
 
         if self.architecture == 2: # restricted dynamics for testing
             w1_t = self.fc1_time[k].weight
-            b1_t =  nn.Parameter(torch.Tensor([2., 2.]), requires_grad=False)
+            b1_t = nn.Parameter(torch.Tensor([2., 2.]), requires_grad=False)
             # nn.Parameter(weights2, requires_grad=False)
             out = self.non_linearity(x.matmul(w1_t.t()) + b1_t)
-            w2_t =  nn.Parameter(torch.Tensor([[2.,0],[0,2.]]), requires_grad=False)
-            b2_t =  nn.Parameter(torch.Tensor([2.,2.]), requires_grad=False)
+            w2_t = nn.Parameter(torch.Tensor([[2., 0], [0, 2.]]), requires_grad=False)
+            b2_t = nn.Parameter(torch.Tensor([2., 2.]), requires_grad=False)
             out = out.matmul(w2_t.t()) + b2_t
             out = out - x
             return out
@@ -155,8 +156,8 @@ class Dynamics(nn.Module):
             # x.matmul(w1_t.t()) is the same as torch.matmul(w1_t,x) simple matrix-vector multiplication
 
             # following lines add the linear layer as a gamma
-            gam = self.gamma[k].bias
-            out = out - gam * x
+        #gam = self.gamma[k].bias
+        out = out - 0.05 * x
 
         return out
 
