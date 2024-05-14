@@ -129,7 +129,94 @@ mask
 node.forward(torch.Tensor([1.,2.,3.]))[0].detach()
 
 # %%
+from torch.distributions.uniform import Uniform
+
 low, high = plotlim  # range of uniform distribution
+size = 70
+shape = size, 3
+X = np.array(Uniform(low, high).sample(shape) )
+ax = plt.figure().add_subplot(projection='3d')
+
+for x0 in X:
+    x1 = node.forward(torch.Tensor(x0))[0].detach()
+    x = np.array([x0[0], x1[0]])
+    y = np.array([x0[1], x1[1]])
+    z = np.array([x0[2], x1[2]])
+    ax.plot(x, y, z)
+
+# %%
+ax = plt.figure().add_subplot(projection='3d')
+start = torch.Tensor([1,2,3.])
+for i in range(200):
+    traj = node.flow.trajectory(start, 10)
+    ax.plot(traj.detach().numpy()[:,0],traj.detach().numpy()[:,1],traj.detach().numpy()[:,2],color='b')
+    start = traj[-1,:]
+for j in range(10):
+    shape = 1,3
+    start = Uniform(0,60).sample(shape)[0]
+    for i in range(80):
+        traj = node.flow.trajectory(start, 10)
+        ax.plot(traj.detach().numpy()[:,0],traj.detach().numpy()[:,1],traj.detach().numpy()[:,2],color='g')
+        start = traj[-1,:]
+    
+
+# %% [markdown]
+# # original system
+
+# %%
+def repressilator(xyz, t):
+    x, y, z = xyz[0], xyz[1], xyz[2]
+    n = 5
+    gamma, lx, ly, lz, deltax, deltay, deltaz, thetax, thetay, thetaz = 0.05, 0.01, 0.02, 0.03, 30.1, 30.2, 20.7, 1, 1.1, 1.2
+    x_dot = - gamma * x + lx + deltax * thetax ** n / (thetax ** n + z ** n)
+    y_dot = - gamma * y + ly + deltay * thetay ** n / (thetay ** n + x ** n)
+    z_dot = - gamma * z + lz + deltaz * thetaz ** n / (thetaz ** n + y ** n)
+    return np.array([x_dot, y_dot, z_dot])
+
+
+# %%
+import scipy
+
+
+iters = 20
+size = [iters, 3]  # dimension of the pytorch tensor to be generated
+low, high = plotlim  # range of uniform distribution
+
 X = np.array(torch.distributions.uniform.Uniform(low, high).sample(size))
-for x in X:
-    y = node.forward(torch.Tensor(x))[0].detach()
+
+deltat = .5
+Y = np.array([scipy.integrate.odeint(repressilator,
+                            X[i, :], np.linspace(0,80*4,100))
+                            for i in range(iters)])
+
+ax = plt.figure().add_subplot(projection='3d')
+for i in range(iters):
+    ax.plot(Y[i,:,0],Y[i,:,1],Y[i,:,2],color='g')
+
+Y = scipy.integrate.odeint(repressilator,
+                            np.array([1,2,3.]), np.linspace(0,200*4,300))
+                            
+ax.plot(Y[:,0],Y[:,1],Y[:,2],color='b')
+
+# %%
+ax = plt.figure().add_subplot(projection='3d')
+start = torch.Tensor([1,2,3.])
+for i in range(200):
+    traj = node.flow.trajectory(start, 20)
+    ax.plot(traj.detach().numpy()[:,0],traj.detach().numpy()[:,1],traj.detach().numpy()[:,2],color='c')
+    start = traj[-1,:]
+Y = scipy.integrate.odeint(repressilator,
+                            np.array([1,2,3.]), np.linspace(0,200*4,300))
+                            
+ax.plot(Y[:,0],Y[:,1],Y[:,2],color='b')
+azm=ax.azim
+
+ax.view_init(elev=20, azim=-1.25*azm)
+
+# %%
+torch.log(torch.abs(node.flow.dynamics.fc2_time[0].weight))
+
+# %%
+mask
+
+# %%
