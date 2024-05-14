@@ -215,13 +215,13 @@ def create_dataloader(data_type, batch_size=3000, noise=0.15, factor=0.15, rando
         X = torch.abs(X + noise * torch.randn(X.shape))
     
     elif data_type == 'restrictedTS':
-        if batch_size > 2:
-            stopHere
+        # if batch_size > 2:
+        #     stopHere
         
         size = [batch_size, 2]  # dimension of the pytorch tensor to be generated
-        low, high = 0, 1  # range of uniform distribution
+        low, high = 0, 5  # range of uniform distribution
 
-        X = torch.Tensor([[1,2],[4.,3.]])
+        X = torch.distributions.uniform.Uniform(low, high).sample(size)
 
         def toggleswitch(x, t):
             W1 = np.array([[0, -1], [-1, 0]])
