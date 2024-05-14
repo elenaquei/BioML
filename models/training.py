@@ -304,11 +304,15 @@ class maskedTrainer():
 
 
 def create_dataloader(data_type, batch_size=3000, noise=0.15, factor=0.15, random_state=1, shuffle=True,
-                      plotlim=[-2, 2], label='scalar'):
+                      plotlim=[-2, 2], label='scalar', system_size=None, system=None):
     label_types = ['scalar', 'vector']
     if label not in label_types:
         raise ValueError("Invalid label type. Expected one of: %s" % label_types)
-
+    if (data_type == 'new' or data_type == 'system') and system is None:
+        raise ValueError("When a new system is requested, an ODE system needs to be given")
+    if (data_type == 'new' or data_type == 'system') and system_size is None:
+        raise ValueError("When a new system is requested, the size of the ODE system needs to be given")
+        
     if data_type == 'circles':
         X, y = make_circles(batch_size, noise=noise, factor=factor, random_state=random_state, shuffle=shuffle)
 
@@ -388,8 +392,8 @@ def create_dataloader(data_type, batch_size=3000, noise=0.15, factor=0.15, rando
         deltat = .5
         # forward the random points in time a lot
         small_sample_size = int(np.floor(batch_size * 0.75))
-        X[:, :small_sample_size] = np.array([scipy.integrate.odeint(repressilator,
-                                                                    X[i, :small_sample_size], [0, 100 * deltat])[-1, :]
+        X[:, :small_sample_size] = np.array([scipy.integrate.odeint(repressilator, 
+                                            X[i, :small_sample_size], [0, 100 * deltat])[-1, :]
                                              for i in range(batch_size)])
         y = np.array([scipy.integrate.odeint(repressilator, X[i, :], [0, deltat])[-1, :] for i in range(batch_size)])
 
@@ -402,7 +406,17 @@ def create_dataloader(data_type, batch_size=3000, noise=0.15, factor=0.15, rando
         y = np.logical_xor(X[:, 0] > 0, X[:, 1] > 0).float()
         # y = y.to(torch.int64)
         X += noise * torch.randn(X.shape)
+    
+    elif data_type == 'new' or data_type == ='system':
+        size = [batch_size, system_size]  # dimension of the pytorch tensor to be generated
+        low, high = plotlim  # range of uniform distribution
 
+        X = torch.distributions.uniform.Uniform(low, high).sample(size)
+
+        deltat = 0.5
+        y = np.array([scipy.integrate.odeint(system, X[i, :], [0, deltat])[-1, :] for i in range(batch_size)])
+        X = torch.Tensor(X + noise * torch.randn(X.shape))
+        
     else:
         print('datatype not supported')
         return None, None
