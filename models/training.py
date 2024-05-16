@@ -259,6 +259,8 @@ class maskedTrainer():
                                 self.model.flow.dynamics.fc3_time[k].weight)
                 elif self.model.flow.dynamics.architecture == 0:
                     weights = self.model.flow.dynamics.fc2_time[k].weight
+                elif self.model.flow.dynamics.architecture == 3:
+                    weights = self.model.flow.dynamics.fc2_time[k].weight
                 else:
                     weights = self.model.flow.dynamics.fc2_time[k].weight
                 unexpected_connections = weights * (1 - self.mask)
@@ -407,7 +409,7 @@ def create_dataloader(data_type, batch_size=3000, noise=0.15, factor=0.15, rando
         # y = y.to(torch.int64)
         X += noise * torch.randn(X.shape)
     
-    elif data_type == 'new' or data_type == ='system':
+    elif data_type == 'new' or data_type == 'system':
         size = [batch_size, system_size]  # dimension of the pytorch tensor to be generated
         low, high = plotlim  # range of uniform distribution
 

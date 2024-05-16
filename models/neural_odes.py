@@ -65,7 +65,7 @@ activations = {'tanh': nn.Tanh(),
                'leakyrelu': nn.LeakyReLU(negative_slope=0.25, inplace=True),
                'tanh_prime': tanh_prime
                }
-architectures = {'inside': -1, 'outside': 0, 'bottleneck': 1, 'restricted': 2}
+architectures = {'inside': -1, 'outside': 0, 'bottleneck': 1, 'restricted': 2, 'grn': 3}
 
 
 class Dynamics(nn.Module):
@@ -93,10 +93,15 @@ class Dynamics(nn.Module):
 
         if self.architecture == 2: # restricted for testing purposes
             blocks1 = [nn.Linear(self.input_dim, hidden_dim) for _ in range(self.time_steps)]
-            self.fc1_time = nn.Sequential(*blocks1)
+            self.fc2_time = nn.Sequential(*blocks1)
             return
         
-        if self.architecture > 0:
+        if self.architecture == 3: # grn architecture : W sigma ( x + b )
+            blocks1 = [nn.Linear(self.input_dim, hidden_dim) for _ in range(self.time_steps)]
+            self.fc2_time = nn.Sequential(*blocks1)
+            return
+            
+        if self.architecture == 1:
             ##-- R^{d_aug} -> R^{d_hid} layer --
             blocks1 = [nn.Linear(self.input_dim, hidden_dim) for _ in range(self.time_steps)]
             self.fc1_time = nn.Sequential(*blocks1)
@@ -118,8 +123,11 @@ class Dynamics(nn.Module):
         f(x(t), u(t)) = f(x,u^k)
         """
         dt = self.T / self.time_steps  # here was no -1 before which does not fit with adjoint solver otherwise
-        k = int(t / dt)
-
+        try:
+            k = int(t / dt)
+        except:
+            print(t)
+            raise ValueError('What is the value of t?')
         if verbose:
             print('x=', x, ' t = ', t)
 
@@ -128,7 +136,7 @@ class Dynamics(nn.Module):
             k = self.T - 1  # here, the dynamics is defined to "continue" with the latest values
 
         if self.architecture == 2: # restricted dynamics for testing
-            w1_t = self.fc1_time[k].weight
+            w1_t = self.fc2_time[k].weight
             b1_t = nn.Parameter(torch.Tensor([2., 2.]), requires_grad=False)
             # nn.Parameter(weights2, requires_grad=False)
             out = self.non_linearity(x.matmul(w1_t.t()) + b1_t)
@@ -137,8 +145,13 @@ class Dynamics(nn.Module):
             out = out.matmul(w2_t.t()) + b2_t
             out = out - x
             return out
-        
-        if self.architecture < 1:
+            
+        if self.architecture == 3: # grn architecture : W sigma ( x + b )
+            w_t = self.fc2_time[k].weight
+            b_t = self.fc2_time[k].bias
+            #print('x=',x,'b=', b_t, 'w=',w_t,'\nsigma(x+b)=', self.non_linearity(x + b_t))
+            out = self.non_linearity(x + b_t).matmul(w_t.t()) 
+        elif self.architecture < 1:
             w_t = self.fc2_time[k].weight
             b_t = self.fc2_time[k].bias
             if self.architecture < 0:  # w(t)\sigma(x(t))+b(t)  inner
@@ -204,7 +217,7 @@ class Semiflow(nn.Module):  # this should allow to calculate the flow for dot(x)
             # out = odeint_adjoint(self.dynamics, x_aug, integration_time, method='dopri5', rtol = 0.1, atol = 0.1)
 
         else:
-            # ßout = odeint(self.dynamics, x_aug, integration_time, method='euler', options={'step_size': dt})
+            # out = odeint(self.dynamics, x_aug, integration_time, method='euler', options={'step_size': dt})
             out = odeint(self.dynamics, x_aug, integration_time, method='dopri5', rtol = 0.001, atol = 0.001)
 
             # i need to put the out into the odeint for the adj_out
