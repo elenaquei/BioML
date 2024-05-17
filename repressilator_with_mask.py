@@ -32,7 +32,7 @@ from models.training import create_dataloader, maskedTrainer
 
 torch.backends.cudnn.deterministic = True
 seed = np.random.randint(1,200)
-seed = 56
+seed = 59
 torch.manual_seed(seed)
 torch.cuda.manual_seed(seed)
 print(seed)
@@ -78,8 +78,8 @@ turnpike = False
 # non_linearity = 'tanh' # OR 'relu' 'sigmoid' 'leakyrelu' 'tanh_prime'
 # architecture = 'inside' 'outside'
 non_linearity = 'tanh'
-architecture = 'inside'
-architectures = {'inside': -1, 'outside': 0, 'bottleneck': 1, 'restricted': 2}
+architecture = 'inside' # architecture grn doesn seem to work as expected
+architectures = {'inside': -1, 'outside': 0, 'bottleneck': 1, 'restricted': 2, 'grn': 3}
 # number of optimization runs in which the dataset is used for gradient decent
 num_epochs = 50
 if problem == 'moons' or problem == 'TS' or problem == "restrictedTS":
@@ -108,7 +108,7 @@ trainer = maskedTrainer(node, optimizer_node, device, mask, cross_entropy=cross_
                          bound=bound, verbose = True) 
 
 # %%
-trainer.train(dataloader, 60)
+trainer.train(dataloader, 50)
 
 # %%
 plt.plot(trainer.histories['loss_history'])
@@ -158,7 +158,7 @@ for j in range(10):
         traj = node.flow.trajectory(start, 10)
         ax.plot(traj.detach().numpy()[:,0],traj.detach().numpy()[:,1],traj.detach().numpy()[:,2],color='g')
         start = traj[-1,:]
-    
+
 
 # %% [markdown]
 # # original system
@@ -199,22 +199,91 @@ Y = scipy.integrate.odeint(repressilator,
 ax.plot(Y[:,0],Y[:,1],Y[:,2],color='b')
 
 # %%
+from matplotlib import cm
+
 ax = plt.figure().add_subplot(projection='3d')
-start = torch.Tensor([1,2,3.])
-for i in range(200):
+start = torch.Tensor([500,20,3.])
+for i in range(1200):
     traj = node.flow.trajectory(start, 20)
     ax.plot(traj.detach().numpy()[:,0],traj.detach().numpy()[:,1],traj.detach().numpy()[:,2],color='c')
     start = traj[-1,:]
 Y = scipy.integrate.odeint(repressilator,
                             np.array([1,2,3.]), np.linspace(0,200*4,300))
                             
-ax.plot(Y[:,0],Y[:,1],Y[:,2],color='b')
-azm=ax.azim
+ax.plot(Y[:,0],Y[:,1],Y[:,2],c=cm.hot(np.abs(0.8*(len(Y[:,1]))/len(Y[:,1]))))
+#azm=ax.azim
 
-ax.view_init(elev=20, azim=-1.25*azm)
+#ax.view_init(elev=20, azim=-1.25*azm)
 
 # %%
-torch.log(torch.abs(node.flow.dynamics.fc2_time[0].weight))
+fig = plt.figure()
+ax = fig.add_subplot(projection='3d')
+
+plot_3d_orbit(Y[:,0],Y[:,1],Y[:,2],range(len(Y[:,1])), ax, plt.get_cmap('winter'))
+
+ax.set_xlim(Y[:,0].min(), Y[:,0].max())
+ax.set_ylim(Y[:,1].min(), Y[:,1].max())
+ax.set_zlim(Y[:,2].min(), Y[:,2].max())
+plt.show()
+#plt.plot(Y[:,0],Y[:,1],c=cm.hot(np.linspace(0,0.8,Y.shape[0])))
+
+# %%
+Y.shape[0]
+
+# %%
+from matplotlib import cm
+
+x = np.linspace(0, 5*np.pi, 300)
+y = np.sin(2*x)
+plt.scatter(x,y, c=cm.hot(np.linspace(0,0.8,x.shape[0])), edgecolor='none')
+
+# %%
+np.abs(0.8*x/np.max(x))
+
+# %%
+np.abs(0.8*np.array(range(Y.shape[0]))/Y.shape[0])
+
+# %%
+import numpy as np
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d.art3d import Line3DCollection
+from matplotlib.cm import ScalarMappable
+from matplotlib.colors import Normalize
+
+def get_segments(x, y, z):
+    """Convert lists of coordinates to a list of segments to be used
+    with Matplotlib's Line3DCollection.
+    """
+    points = np.ma.array((x, y, z)).T.reshape(-1, 1, 3)
+    return np.ma.concatenate([points[:-1], points[1:]], axis=1)
+
+
+def plot_3d_orbit(x,y,z,T, ax, cmap=plt.get_cmap("bwr")):
+    segments = get_segments(x, y, z)
+    c = Line3DCollection(segments, cmap=cmap, array=T)
+    ax.add_collection(c)
+
+fig = plt.figure()
+ax = fig.add_subplot(projection='3d')
+n = 100
+cmap = plt.get_cmap("bwr")
+theta = np.linspace(-4 * np.pi, 4 * np.pi, n)
+z = np.linspace(-2, 2, n)
+r = z**2 + 1
+x = r * np.sin(theta)
+y = r * np.cos(theta)
+T = np.linspace(0,0.8,n)
+
+plot_3d_orbit(x,y,z,T, ax, plt.get_cmap('Blues'))
+plot_3d_orbit(x,y,z+3,T, ax, plt.get_cmap('Greens'))
+
+ax.set_xlim(x.min(), x.max())
+ax.set_ylim(y.min(), y.max())
+ax.set_zlim(z.min(), z.max()+3)
+plt.show()
+
+# %%
+node.flow.dynamics.fc2_time[0].weight
 
 # %%
 mask
