@@ -317,7 +317,7 @@ def create_dataloader(data_type, batch_size=3000, noise=0.15, factor=0.15, rando
     train = DataLoader(train_data, batch_size=64, shuffle=shuffle, generator=g)
     test = DataLoader(test_data, batch_size=256, shuffle=shuffle, generator=g)  # 128 before
 
-    return train, test
+    return train, test, X_train
 
 
 def create_dataloader_other(data_type, batch_size=3000, noise=0.15, factor=0.15, random_state=1, shuffle=True,

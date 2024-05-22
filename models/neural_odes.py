@@ -142,6 +142,7 @@ class Dynamics(nn.Module):
             b_t = self.fc2_time[k].bias
             if self.architecture < 0:  # w(t)\sigma(x(t))+b(t)  inner
                 out = self.non_linearity(x).matmul(w_t.t()) + b_t
+                out = out - x
             else:  # \sigma(w(t)x(t)+b(t))   outer
                 out = self.non_linearity(x.matmul(w_t.t()) + b_t)
         else:  # w1(t)\sigma(w2(t)x(t)+b2(t))+b1(t) bottle-neck
