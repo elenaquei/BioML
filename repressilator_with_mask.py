@@ -147,17 +147,21 @@ for x0 in X:
 # %%
 ax = plt.figure().add_subplot(projection='3d')
 start = torch.Tensor([1,2,3.])
-for i in range(200):
+for i in range(400):
     traj = node.flow.trajectory(start, 10)
-    ax.plot(traj.detach().numpy()[:,0],traj.detach().numpy()[:,1],traj.detach().numpy()[:,2],color='b')
+    if i > 100:
+        ax.plot(traj.detach().numpy()[:,0],traj.detach().numpy()[:,1],traj.detach().numpy()[:,2],color='b')
     start = traj[-1,:]
-for j in range(10):
+for j in range(3):
     shape = 1,3
-    start = Uniform(0,60).sample(shape)[0]
-    for i in range(80):
+    start = Uniform(0,10).sample(shape)[0]
+    for i in range(90):
         traj = node.flow.trajectory(start, 10)
         ax.plot(traj.detach().numpy()[:,0],traj.detach().numpy()[:,1],traj.detach().numpy()[:,2],color='g')
         start = traj[-1,:]
+
+
+plt.savefig('retrieved_repressilator')
 
 
 # %% [markdown]
@@ -178,11 +182,11 @@ def repressilator(xyz, t):
 import scipy
 
 
-iters = 20
+iters = 5
 size = [iters, 3]  # dimension of the pytorch tensor to be generated
 low, high = plotlim  # range of uniform distribution
 
-X = np.array(torch.distributions.uniform.Uniform(low, high).sample(size))
+X = np.array(torch.distributions.uniform.Uniform(0, 60).sample(size))
 
 deltat = .5
 Y = np.array([scipy.integrate.odeint(repressilator,
@@ -194,9 +198,10 @@ for i in range(iters):
     ax.plot(Y[i,:,0],Y[i,:,1],Y[i,:,2],color='g')
 
 Y = scipy.integrate.odeint(repressilator,
-                            np.array([1,2,3.]), np.linspace(0,200*4,300))
+                            Y[i,-1,:], np.linspace(0,200*4,300))
                             
 ax.plot(Y[:,0],Y[:,1],Y[:,2],color='b')
+plt.savefig('repressilator')
 
 # %%
 from matplotlib import cm
@@ -205,12 +210,13 @@ ax = plt.figure().add_subplot(projection='3d')
 start = torch.Tensor([500,20,3.])
 for i in range(1200):
     traj = node.flow.trajectory(start, 20)
-    ax.plot(traj.detach().numpy()[:,0],traj.detach().numpy()[:,1],traj.detach().numpy()[:,2],color='c')
+    ax.plot(traj.detach().numpy()[:,0],traj.detach().numpy()[:,1],traj.detach().numpy()[:,2],color='b')
     start = traj[-1,:]
 Y = scipy.integrate.odeint(repressilator,
                             np.array([1,2,3.]), np.linspace(0,200*4,300))
-                            
-ax.plot(Y[:,0],Y[:,1],Y[:,2],c=cm.hot(np.abs(0.8*(len(Y[:,1]))/len(Y[:,1]))))
+
+#ax.plot(Y[:,0],Y[:,1],Y[:,2],c=cm.hot(np.abs(0.8*(len(Y[:,1]))/len(Y[:,1]))))
+ax.plot(Y[:,0],Y[:,1],Y[:,2],c='g'))
 #azm=ax.azim
 
 #ax.view_init(elev=20, azim=-1.25*azm)
