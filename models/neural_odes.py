@@ -65,7 +65,7 @@ activations = {'tanh': nn.Tanh(),
                'leakyrelu': nn.LeakyReLU(negative_slope=0.25, inplace=True),
                'tanh_prime': tanh_prime
                }
-architectures = {'inside': -1, 'outside': 0, 'bottleneck': 1, 'restricted': 2}
+architectures = {'inside': -1, 'outside': 0, 'bottleneck': 1, 'restricted': 2, 'restr_repr':3}
 
 
 class Dynamics(nn.Module):
@@ -83,6 +83,8 @@ class Dynamics(nn.Module):
         self.input_dim = data_dim + augment_dim
         self.hidden_dim = hidden_dim
 
+        print(architecture)
+
         if non_linearity not in activations.keys() or architecture not in architectures.keys():
             raise ValueError("Activation function or architecture not found. Please reconsider.")
 
@@ -91,7 +93,7 @@ class Dynamics(nn.Module):
         self.T = T
         self.time_steps = time_steps
 
-        if self.architecture == 2: # restricted for testing purposes
+        if self.architecture == 2 or self.architecture == 3: # restricted for testing purposes
             blocks1 = [nn.Linear(self.input_dim, hidden_dim) for _ in range(self.time_steps)]
             self.fc1_time = nn.Sequential(*blocks1)
             return
@@ -125,6 +127,17 @@ class Dynamics(nn.Module):
         if k > self.T - 1:
             # warn('Extending the dynamics')
             k = self.T - 1  # here, the dynamics is defined to "continue" with the latest values
+
+        if self.architecture == 3: # restricted dynamics for repressilator
+            w1_t = self.fc1_time[k].weight
+            b1_t =  nn.Parameter(torch.Tensor([2., 2., 2.]), requires_grad=False)
+            # nn.Parameter(weights2, requires_grad=False)
+            out = self.non_linearity(x.matmul(w1_t.t()) + b1_t)
+            w2_t =  nn.Parameter(torch.Tensor([[2.1,0,0],[0,2.,0.],[0.,0,2.]]), requires_grad=False)
+            b2_t =  nn.Parameter(torch.Tensor([2.,2.,2.]), requires_grad=False)
+            out = out.matmul(w2_t.t()) + b2_t
+            out = out - x
+            return out
 
         if self.architecture == 2: # restricted dynamics for testing
             w1_t = self.fc1_time[k].weight

@@ -454,7 +454,7 @@ def create_dataloader(data_type, batch_size=3000, noise=0.15, factor=0.15, rando
         return None, None
 
     if label == 'vector':
-        if data_type == 'TS' or data_type == 'repr' or data_type == 'restrictedTS' or data_type == 'restrictedTS_alt':
+        if data_type == 'TS' or data_type == 'repr' or data_type == 'restrictedTS' or data_type == 'restrictedTS_alt' or data_type == 'repr_alt':
             print('No change  applied to TS or repr data')
             # y = np.array([(1., 0.) if label == 1 else (0., 1.) for label in y])
         else:
@@ -465,7 +465,9 @@ def create_dataloader(data_type, batch_size=3000, noise=0.15, factor=0.15, rando
 
     # X = StandardScaler().fit_transform(X)
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=.2, random_state=random_state, shuffle=shuffle)
-    if data_type == 'restrictedTS' or data_type == 'restrictedTS_alt':
+
+    # forego making train and test datasets for restricted dynamics
+    if data_type == 'restrictedTS' or data_type == 'restrictedTS_alt' or data_type == 'repr_alt':
         X_test, X_train = X, X
         y_train, y_test = y, y
 
