@@ -63,8 +63,8 @@ hold on
 % fill(x2,e_mask11_22,'m','FaceAlpha',0.1)
 % hold on
 % fill(x2,e_restr,'b','FaceAlpha',0.1)
-legend('Restricted','Inside: No mask','Inside: Mask one diagonal element','Inside: Mask both diagonal elements')
-ylabel('% of fits with correct relation x,y')
+legend('Known dynamics','No mask','Mask one self-activation/inhibition','Mask all self-activation/inhibition')
+ylabel('Fraction of fits with correct relation x,y')
 xlabel('Amount of data points')
 ylim([0,1]);
 fontsize(fig, 14, "points")

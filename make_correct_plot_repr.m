@@ -33,7 +33,7 @@ e_inside = [l_inside,fliplr(h_inside)];
 % e_mask11 = [l_mask11,fliplr(h_mask11)];
 
 mask11_22 = [];
-for k=2:18
+for k=2:10
     load(['repr_mask_n',num2str(k),'.mat']);
     [p_av,p_cnt,p_min,p_split,correct,rho_av,rho_cnt,rho_min,A] = evaluate_fits_repr(X,l,symm,offdiag,W1,0);
     mask11_22 = [mask11_22, correct];
@@ -51,7 +51,7 @@ plot(x,restricted,LineWidth=2)
 hold on
 plot(x,inside,LineWidth=2);
 hold on
-plot(2:18,mask11_22,LineWidth=2);
+plot(x,mask11_22,LineWidth=2);
 hold on
 % x2 = [x,fliplr(x)];
 % fill(x2,e_inside,'r','FaceAlpha',0.1)
@@ -61,8 +61,8 @@ hold on
 % fill(x2,e_mask11_22,'m','FaceAlpha',0.1)
 % hold on
 % fill(x2,e_restr,'b','FaceAlpha',0.1)
-legend('Restricted','Inside: No mask','Inside: Mask all undesired elements')
-ylabel('% of fits with correct relation x-|y-|z-|x')
+legend('Known dynamics','No mask','Mask all undesired elements')
+ylabel('Fraction of fits with negative feedback loop')
 xlabel('Amount of data points')
 ylim([0,1]);
 fontsize(fig, 14, "points")
