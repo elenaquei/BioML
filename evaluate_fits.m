@@ -1,9 +1,22 @@
+function [p_av,p_cnt,p_min,p_split,correct,rho_av,rho_cnt,rho_min,A] = evaluate_fits(X,l,symm,offdiag,W1,plt,alt)
 close all
+
+if nargin < 7
+    alt = 0;
+end
 
 sz = size(X);
 N = sz(1); % find number of fits
 Nin = sz(2); % find number of data points
 Nvar = sz(3); % find number of state variables
+
+if alt
+    symm = [];
+    for k=1:N
+        W = [W1(k,1,1),W1(k,1,2);W1(k,2,1),W1(k,2,2)];
+        symm = [symm,abs(W(1,2)+1.5)+abs(W(2,1)+0.8)];
+    end
+end
 
 % find good fits and bad fits
 [gr,gr_c] = find_good_fits(offdiag,symm,N);
@@ -19,6 +32,7 @@ split_dat =  zeros(N,1);
 cnt_dat = zeros(N,1);
 
 % loop over optimisations to find some metrics
+correct = 0;
 for k=1:N
     
     % find the initial conditions for the given optimisation set
@@ -70,7 +84,14 @@ for k=1:N
     end
     mindist = [mindist, min(dist)];
     avdist = [avdist, mean(dist)];
+    
+    % check if correct relation between x,y is found
+    W = [W1(k,1,1),W1(k,1,2);W1(k,2,1),W1(k,2,2)];
+    correct = correct + double(W(1,2)<-0.5 && W(2,1)<-0.5);
+
 end
+
+correct = correct/N;
 
 % compute statistics
 
@@ -95,29 +116,32 @@ A = [length(intersect(gr_split,gr)),length(intersect(gr,gr_split_c));length(inte
 [~,p_split,~] = fishertest(A);
 
 % plot results
-[dat1,edges1] = histcounts2(x_gr,y_gr,15);
-figure
-imagesc(edges1(1),edges1(2),flip(dat1));
-xticklabels({0    0.7143    1.4286    2.1429    2.8571    3.5714    4.2857    5.0000})
-yticklabels({5.0000    4.2857    3.5714    2.8571    2.1429    1.4286    0.7143         0})
-title('Position of data points for good fits')
-
-[dat2,edges2] = histcounts2(x_gr_c,y_gr_c,15);
-figure
-imagesc(edges2(1),edges2(2),flip(dat2));
-xticklabels({0    0.7143    1.4286    2.1429    2.8571    3.5714    4.2857    5.0000})
-yticklabels({5.0000    4.2857    3.5714    2.8571    2.1429    1.4286    0.7143         0})
-title('Position of data points for bad fits')
-
-figure
-plot(mindist,symm+offdiag,'o')
-xlabel('Minimum distance to separatrix between datapoints (|x-y|)')
-ylabel('|W_1_1|+|W_2_2| + |W_1_2-W_2_1|')
-
-figure
-plot(avdist,symm+offdiag,'o')
-xlabel('Average distance to separatrix between datapoints (|x-y|)')
-ylabel('|W_1_1|+|W_2_2| + |W_1_2-W_2_1|')
+if plt
+    [dat1,edges1] = histcounts2(x_gr,y_gr,15);
+    figure
+    imagesc(edges1(1),edges1(2),flip(dat1));
+    xticklabels({0    0.7143    1.4286    2.1429    2.8571    3.5714    4.2857    5.0000})
+    yticklabels({5.0000    4.2857    3.5714    2.8571    2.1429    1.4286    0.7143         0})
+    title('Position of data points for good fits')
+    
+    [dat2,edges2] = histcounts2(x_gr_c,y_gr_c,15);
+    figure
+    imagesc(edges2(1),edges2(2),flip(dat2));
+    xticklabels({0    0.7143    1.4286    2.1429    2.8571    3.5714    4.2857    5.0000})
+    yticklabels({5.0000    4.2857    3.5714    2.8571    2.1429    1.4286    0.7143         0})
+    title('Position of data points for bad fits')
+    
+    figure
+    plot(mindist,symm+offdiag,'o')
+    xlabel('Minimum distance to separatrix between datapoints (|x-y|)')
+    ylabel('|W_1_1|+|W_2_2| + |W_1_2-W_2_1|')
+    
+    figure
+    plot(avdist,symm+offdiag,'o')
+    xlabel('Average distance to separatrix between datapoints (|x-y|)')
+    ylabel('|W_1_1|+|W_2_2| + |W_1_2-W_2_1|')
+end
+end
 
 
 % function to find the fits that went well (i.e. low diagonal elements and
