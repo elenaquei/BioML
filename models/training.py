@@ -423,6 +423,25 @@ def create_dataloader(data_type, batch_size=3000, noise=0.15, factor=0.15, rando
         # y = y.to(torch.int64)
         X = torch.abs(torch.from_numpy(X) + noise * torch.randn(X.shape))
 
+    elif data_type == 'repr_alt':
+        size = [batch_size, 3]  # dimension of the pytorch tensor to be generated
+        low, high = plotlim  # range of uniform distribution
+
+        X = np.array(torch.distributions.uniform.Uniform(low, high).sample(size))
+
+        def repressilator(xyz, t):
+            x, y, z = xyz[0], xyz[1], xyz[2]
+            x_dot = - x + 2 + 2.2*np.tanh(-z + 2)
+            y_dot = - y + 2 + 2*np.tanh(-x + 2)
+            z_dot = - z + 2 + 2*np.tanh(-y + 2)
+            return np.array([x_dot, y_dot, z_dot])
+
+        deltat = 2.0
+
+        y = np.array([scipy.integrate.odeint(repressilator, X[i, :], [0, deltat])[-1, :] for i in range(batch_size)])
+
+        #X = torch.abs(torch.from_numpy(X) + noise * torch.randn(X.shape))
+
     elif data_type == 'xor':
         X = torch.randint(low=0, high=2, size=(batch_size, 2), dtype=torch.float32)
         y = np.logical_xor(X[:, 0] > 0, X[:, 1] > 0).float()
