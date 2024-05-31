@@ -65,7 +65,7 @@ activations = {'tanh': nn.Tanh(),
                'leakyrelu': nn.LeakyReLU(negative_slope=0.25, inplace=True),
                'tanh_prime': tanh_prime
                }
-architectures = {'inside': -1, 'outside': 0, 'bottleneck': 1, 'restricted': 2, 'grn': 3}
+architectures = {'inside': -1, 'outside': 0, 'bottleneck': 1, 'restricted': 2, 'restr_repr': 3, 'grn': 4}
 
 
 class Dynamics(nn.Module):
@@ -91,16 +91,16 @@ class Dynamics(nn.Module):
         self.T = T
         self.time_steps = time_steps
 
-        if self.architecture == 2: # restricted for testing purposes
+        if self.architecture == 2 or self.architecture == 3:  # restricted for testing purposes
             blocks1 = [nn.Linear(self.input_dim, hidden_dim) for _ in range(self.time_steps)]
             self.fc2_time = nn.Sequential(*blocks1)
             return
-        
-        if self.architecture == 3: # grn architecture : W sigma ( x + b )
+
+        if self.architecture == 4:  # grn architecture : W sigma ( x + b )
             blocks1 = [nn.Linear(self.input_dim, hidden_dim) for _ in range(self.time_steps)]
             self.fc2_time = nn.Sequential(*blocks1)
             return
-            
+
         if self.architecture == 1:
             ##-- R^{d_aug} -> R^{d_hid} layer --
             blocks1 = [nn.Linear(self.input_dim, hidden_dim) for _ in range(self.time_steps)]
@@ -117,7 +117,7 @@ class Dynamics(nn.Module):
         # blocks_gamma = [nn.Linear(self.input_dim, hidden_dim) for _ in range(self.time_steps)]
         # self.gamma = nn.Sequential(*blocks_gamma)
 
-    def forward(self, t, x, verbose = False):
+    def forward(self, t, x, verbose=False):
         """
         The output of the class -> f(x(t), u(t)).
         f(x(t), u(t)) = f(x,u^k)
@@ -135,7 +135,18 @@ class Dynamics(nn.Module):
             # warn('Extending the dynamics')
             k = self.T - 1  # here, the dynamics is defined to "continue" with the latest values
 
-        if self.architecture == 2: # restricted dynamics for testing
+        if self.architecture == 3:  # restricted dynamics for repressilator
+            w1_t = self.fc2_time[k].weight
+            b1_t = nn.Parameter(torch.Tensor([2., 2., 2.]), requires_grad=False)
+            # nn.Parameter(weights2, requires_grad=False)
+            out = self.non_linearity(x.matmul(w1_t.t()) + b1_t)
+            w2_t = nn.Parameter(torch.Tensor([[2.2, 0, 0], [0, 2., 0.], [0., 0, 2.]]), requires_grad=False)
+            b2_t = nn.Parameter(torch.Tensor([2., 2., 2.]), requires_grad=False)
+            out = out.matmul(w2_t.t()) + b2_t
+            out = out - x
+            return out
+
+        if self.architecture == 2:  # restricted dynamics for testing
             w1_t = self.fc2_time[k].weight
             b1_t = nn.Parameter(torch.Tensor([2., 2.]), requires_grad=False)
             # nn.Parameter(weights2, requires_grad=False)
@@ -145,12 +156,12 @@ class Dynamics(nn.Module):
             out = out.matmul(w2_t.t()) + b2_t
             out = out - x
             return out
-            
-        if self.architecture == 3: # grn architecture : W sigma ( x + b )
+
+        if self.architecture == 4:  # grn architecture : W sigma ( x + b )
             w_t = self.fc2_time[k].weight
             b_t = self.fc2_time[k].bias
-            #print('x=',x,'b=', b_t, 'w=',w_t,'\nsigma(x+b)=', self.non_linearity(x + b_t))
-            out = self.non_linearity(x + b_t).matmul(w_t.t()) 
+            # print('x=',x,'b=', b_t, 'w=',w_t,'\nsigma(x+b)=', self.non_linearity(x + b_t))
+            out = self.non_linearity(x + b_t).matmul(w_t.t())
         elif self.architecture < 1:
             w_t = self.fc2_time[k].weight
             b_t = self.fc2_time[k].bias
@@ -169,7 +180,7 @@ class Dynamics(nn.Module):
             # x.matmul(w1_t.t()) is the same as torch.matmul(w1_t,x) simple matrix-vector multiplication
 
             # following lines add the linear layer as a gamma
-        #gam = self.gamma[k].bias
+        # gam = self.gamma[k].bias
         out = out - 0.05 * x
 
         return out
@@ -218,7 +229,7 @@ class Semiflow(nn.Module):  # this should allow to calculate the flow for dot(x)
 
         else:
             # out = odeint(self.dynamics, x_aug, integration_time, method='euler', options={'step_size': dt})
-            out = odeint(self.dynamics, x_aug, integration_time, method='dopri5', rtol = 0.001, atol = 0.001)
+            out = odeint(self.dynamics, x_aug, integration_time, method='dopri5', rtol=0.001, atol=0.001)
 
             # i need to put the out into the odeint for the adj_out
             # adj_out = odeint(self.adj_dynamics, torch.eye(x.shape[0]), torch.flip(integration_time,[0]), method='euler', options={'step_size': dt}) #this is new for the adjoint
@@ -271,22 +282,21 @@ class NeuralODE(nn.Module):
                             self.time_steps)
 
         self.flow = Semiflow(device, dynamics, tol, adjoint, T, time_steps)  # , self.adj_flow
-        #self.linear_layer = nn.Linear(self.flow.dynamics.input_dim,
+        # self.linear_layer = nn.Linear(self.flow.dynamics.input_dim,
         #                              self.output_dim)
-        #self.non_linearity = nn.Tanh()  # not really sure why this is here
+        # self.non_linearity = nn.Tanh()  # not really sure why this is here
 
     def forward(self, x, return_features=False):
 
         features = self.flow(x)
 
         self.traj = self.flow.trajectory(x, self.time_steps)
-        #pred = self.linear_layer(features)
-        #self.proj_traj = self.linear_layer(self.traj)
-        #if not self.cross_entropy:
+        # pred = self.linear_layer(features)
+        # self.proj_traj = self.linear_layer(self.traj)
+        # if not self.cross_entropy:
         #    pred = self.non_linearity(pred)
         #    self.proj_traj = self.non_linearity(self.proj_traj)
 
         if return_features:
             return features, self.traj
         return features, self.traj
-

@@ -216,7 +216,7 @@ Y = scipy.integrate.odeint(repressilator,
                             np.array([1,2,3.]), np.linspace(0,200*4,300))
 
 #ax.plot(Y[:,0],Y[:,1],Y[:,2],c=cm.hot(np.abs(0.8*(len(Y[:,1]))/len(Y[:,1]))))
-ax.plot(Y[:,0],Y[:,1],Y[:,2],c='g'))
+ax.plot(Y[:,0],Y[:,1],Y[:,2],c='g')
 #azm=ax.azim
 
 #ax.view_init(elev=20, azim=-1.25*azm)

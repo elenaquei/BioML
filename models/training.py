@@ -128,17 +128,10 @@ class doublebackTrainer():
                     print("\nIteration {}/{}".format(i, len(data_loader)))
                     if self.cross_entropy:
                         print("Loss: {:.3f}".format(loss))
-                        print("Robust Term Loss: {:.3f}".format(loss_rob))
-
-                        print("Accuracy: {:.3f}".format((softpred == y_batch).sum().item() / (y_batch.size(0))))
-
                     else:
                         print("Loss: {:.3f}".format(loss))
 
             self.buffer['loss'].append(loss.item())
-
-            if not self.fixed_projector and self.cross_entropy:
-                self.buffer['accuracy'].append((softpred == y_batch).sum().item() / (y_batch.size(0)))
 
             # At every record_freq iteration, record mean loss and clear buffer
             if self.steps % self.record_freq == 0:
@@ -256,7 +249,7 @@ class maskedTrainer():
             for k in range(self.model.time_steps):
                 if self.model.flow.dynamics.architecture == 1:
                     weights = self.model.flow.dynamics.fc1_time[k].weight.matmul(
-                                self.model.flow.dynamics.fc3_time[k].weight)
+                        self.model.flow.dynamics.fc3_time[k].weight)
                 elif self.model.flow.dynamics.architecture == 0:
                     weights = self.model.flow.dynamics.fc2_time[k].weight
                 elif self.model.flow.dynamics.architecture == 3:
@@ -306,7 +299,7 @@ class maskedTrainer():
 
 
 def create_dataloader(data_type, batch_size=3000, noise=0.15, factor=0.15, random_state=1, shuffle=True,
-                      plotlim=[-2, 2], label='scalar', system_size=None, system=None):
+                      plotlim=[-2, 2], label='scalar', system_size=None, system=None, Figure=True):
     label_types = ['scalar', 'vector']
     if label not in label_types:
         raise ValueError("Invalid label type. Expected one of: %s" % label_types)
@@ -314,7 +307,7 @@ def create_dataloader(data_type, batch_size=3000, noise=0.15, factor=0.15, rando
         raise ValueError("When a new system is requested, an ODE system needs to be given")
     if (data_type == 'new' or data_type == 'system') and system_size is None:
         raise ValueError("When a new system is requested, the size of the ODE system needs to be given")
-        
+
     if data_type == 'circles':
         X, y = make_circles(batch_size, noise=noise, factor=factor, random_state=random_state, shuffle=shuffle)
 
@@ -385,7 +378,7 @@ def create_dataloader(data_type, batch_size=3000, noise=0.15, factor=0.15, rando
         def repressilator(xyz, t):
             x, y, z = xyz[0], xyz[1], xyz[2]
             n = 5
-            gamma, lx, ly, lz, deltax, deltay, deltaz, thetax, thetay, thetaz = 0.05, 0.01, 0.02, 0.03, 30.1, 30.2, 20.7, 1, 1.1, 1.2
+            gamma, lx, ly, lz, deltax, deltay, deltaz, thetax, thetay, thetaz = 0.05, 0.01, 0.02, 0.03, 3.1, 3.2, 2.7, 1, 1.1, 1.2
             x_dot = - gamma * x + lx + deltax * thetax ** n / (thetax ** n + z ** n)
             y_dot = - gamma * y + ly + deltay * thetay ** n / (thetay ** n + x ** n)
             z_dot = - gamma * z + lz + deltaz * thetaz ** n / (thetaz ** n + y ** n)
@@ -394,21 +387,38 @@ def create_dataloader(data_type, batch_size=3000, noise=0.15, factor=0.15, rando
         deltat = .5
         # forward the random points in time a lot
         small_sample_size = int(np.floor(batch_size * 0.75))
-        X[:, :small_sample_size] = np.array([scipy.integrate.odeint(repressilator, 
-                                            X[i, :small_sample_size], [0, 100 * deltat])[-1, :]
-                                             for i in range(batch_size)])
+        #X[:, :small_sample_size] = np.array([scipy.integrate.odeint(repressilator,
+        #                                                            X[i, :small_sample_size], [0, 100 * deltat])[-1, :]
+        #                                     for i in range(batch_size)])
         y = np.array([scipy.integrate.odeint(repressilator, X[i, :], [0, deltat])[-1, :] for i in range(batch_size)])
 
         # np.array((X[:, 0] > X[:, 1]).float())
         # y = y.to(torch.int64)
         X = torch.abs(torch.from_numpy(X) + noise * torch.randn(X.shape))
 
+    elif data_type == 'repr_alt':
+        size = [batch_size, 3]  # dimension of the pytorch tensor to be generated
+        low, high = plotlim  # range of uniform distribution
+
+        X = np.array(torch.distributions.uniform.Uniform(low, high).sample(size))
+
+        def repressilator(xyz, t):
+            x, y, z = xyz[0], xyz[1], xyz[2]
+            x_dot = - x + 2 + 2.2 * np.tanh(-z + 2)
+            y_dot = - y + 2 + 2 * np.tanh(-x + 2)
+            z_dot = - z + 2 + 2 * np.tanh(-y + 2)
+            return np.array([x_dot, y_dot, z_dot])
+
+        deltat = 1.
+
+        y = np.array([scipy.integrate.odeint(repressilator, X[i, :], [0, deltat])[-1, :] for i in range(batch_size)])
+
     elif data_type == 'xor':
         X = torch.randint(low=0, high=2, size=(batch_size, 2), dtype=torch.float32)
         y = np.logical_xor(X[:, 0] > 0, X[:, 1] > 0).float()
         # y = y.to(torch.int64)
         X += noise * torch.randn(X.shape)
-    
+
     elif data_type == 'new' or data_type == 'system':
         size = [batch_size, system_size]  # dimension of the pytorch tensor to be generated
         low, high = plotlim  # range of uniform distribution
@@ -418,16 +428,13 @@ def create_dataloader(data_type, batch_size=3000, noise=0.15, factor=0.15, rando
         deltat = 0.5
         y = np.array([scipy.integrate.odeint(system, X[i, :], [0, deltat])[-1, :] for i in range(batch_size)])
         X = torch.Tensor(X + noise * torch.randn(X.shape))
-        
+
     else:
         print('datatype not supported')
         return None, None
 
     if label == 'vector':
-        if data_type == 'TS' or data_type == 'repr' or data_type == 'restrictedTS':
-            print('No change  applied to TS or repr data')
-            # y = np.array([(1., 0.) if label == 1 else (0., 1.) for label in y])
-        else:
+        if not(data_type == 'TS' or data_type == 'repr' or data_type == 'repr_alt' or data_type == 'restrictedTS'):
             y = np.array([(2., 0.) if label == 1 else (-2., 0.) for label in y])
 
     g = torch.Generator()
@@ -472,22 +479,74 @@ def create_dataloader(data_type, batch_size=3000, noise=0.15, factor=0.15, rando
         data_1 = X_train[y_train[:, 0] < 0]
     fig = plt.figure(figsize=(5, 5), dpi=100)
 
-    if data_type == 'repr':
-        ax = fig.add_subplot(projection='3d')
-        ax.scatter(X_train[:, 0], X_train[:, 1], X_train[:, 2], edgecolor="#333", alpha=0.5)
-        ax.scatter(y_train[:, 0], y_train[:, 1], y_train[:, 2], edgecolor="#333", alpha=0.5)
-        # plt.xlim(plotlim)
-        # plt.ylim(plotlim)
-        # plt.zlim(plotlim)
+    if Figure:
+        if data_type == 'repr' or data_type == 'repr_alt':
+            ax = fig.add_subplot(projection='3d')
+            ax.scatter(X_train[:, 0], X_train[:, 1], X_train[:, 2], edgecolor="#333", alpha=0.5)
+            ax.scatter(y_train[:, 0], y_train[:, 1], y_train[:, 2], edgecolor="#333", alpha=0.5)
+            # plt.xlim(plotlim)
+            # plt.ylim(plotlim)
+            # plt.zlim(plotlim)
+        else:
+            plt.scatter(data_0[:, 0], data_0[:, 1], edgecolor="#333", alpha=0.5)
+            plt.scatter(data_1[:, 0], data_1[:, 1], edgecolor="#333", alpha=0.5)
+            plt.xlim(plotlim)
+            plt.ylim(plotlim)
+            ax = plt.gca()
+            ax.set_aspect('equal')
+        plt.savefig('trainingset.png', bbox_inches='tight', dpi=300, format='png', facecolor='white')
+        plt.show()
+
+    return train, test
+
+
+def from_map_to_XYdataset(map, dim, batch_size=3000, plotlim=[0, 5], random_state=1, noise=0.15):
+    if random_state:
+        g = torch.Generator()
+        g.manual_seed(random_state)
+
+    size = [batch_size, dim]  # dimension of the pytorch tensor to be generated
+    low, high = plotlim  # range of uniform distribution
+
+    X = np.array(torch.distributions.uniform.Uniform(low, high).sample(size))
+    Y = np.array([map(X[i, :]) for i in range(batch_size)])
+    Y += noise * torch.randn(Y.shape)
+
+    return X, Y
+
+
+def from_numpyXY_to_dataloader(X, Y, random_state, label='vector'):
+    if random_state:
+        g = torch.Generator()
+        g.manual_seed(random_state)
+
+    X_train, X_test, y_train, y_test = train_test_split(X, Y, test_size=.2, random_state=random_state, shuffle=True)
+
+    X_train = torch.Tensor(X_train)  # transform to torch tensor for dataloader
+    y_train = torch.Tensor(y_train)  # transform to torch tensor for dataloader
+
+    X_test = torch.Tensor(X_test)  # transform to torch tensor for dataloader
+    y_test = torch.Tensor(y_test)  # transform to torch tensor for dataloader
+
+    if label == 'scalar':
+        X_train = X_train.type(torch.float32)  # type of orginial pickle.load data
+        y_train = y_train.type(torch.int64)  # dtype of original picle.load data
+
+        X_test = X_test.type(torch.float32)  # type of orginial pickle.load data
+        y_test = y_test.type(torch.int64)  # dtype of original picle.load data
+
     else:
-        plt.scatter(data_0[:, 0], data_0[:, 1], edgecolor="#333", alpha=0.5)
-        plt.scatter(data_1[:, 0], data_1[:, 1], edgecolor="#333", alpha=0.5)
-        plt.xlim(plotlim)
-        plt.ylim(plotlim)
-        ax = plt.gca()
-        ax.set_aspect('equal')
-    plt.savefig('trainingset.png', bbox_inches='tight', dpi=300, format='png', facecolor='white')
-    plt.show()
+        X_train = X_train.type(torch.float32)  # type of orginial pickle.load data
+        y_train = y_train.type(torch.float32)  # dtype of original picle.load data
+
+        X_test = X_test.type(torch.float32)  # type of orginial pickle.load data
+        y_test = y_test.type(torch.float32)  # dtype of original picle.load data
+
+    train_data = TensorDataset(X_train, y_train)  # create your datset
+    test_data = TensorDataset(X_test, y_test)
+
+    train = DataLoader(train_data, batch_size=64, shuffle=True, generator=g)
+    test = DataLoader(test_data, batch_size=256, shuffle=True, generator=g)  # 128 before
 
     return train, test
 
@@ -533,10 +592,7 @@ def create_dataloader_other(data_type, batch_size=3000, noise=0.15, factor=0.15,
         return None, None
 
     if label == 'vector':
-        if data_type == 'TS' or data_type == 'repr':
-            print('No change applied to TS or repr data')
-            # y = np.array([(1., 0.) if label == 1 else (0., 1.) for label in y])
-        else:
+        if not(data_type == 'TS' or data_type == 'repr' or data_type == 'repr_alt'):
             y = np.array([(2., 0.) if label == 1 else (-2., 0.) for label in y])
 
     g = torch.Generator()
