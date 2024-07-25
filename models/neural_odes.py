@@ -208,8 +208,6 @@ class Semiflow(nn.Module):  # this should allow to calculate the flow for dot(x)
 
     def forward(self, x, eval_times=None):
 
-        dt = self.T / self.time_steps
-
         if eval_times is None:
             integration_time = torch.tensor([0, self.T]).float().type_as(x)
         else:
@@ -222,17 +220,7 @@ class Semiflow(nn.Module):  # this should allow to calculate the flow for dot(x)
         else:
             x_aug = x
 
-        if self.adjoint:
-            out = odeint_adjoint(self.dynamics, x_aug, integration_time, method='euler', options={'step_size': dt})
-
-            # out = odeint_adjoint(self.dynamics, x_aug, integration_time, method='dopri5', rtol = 0.1, atol = 0.1)
-
-        else:
-            # out = odeint(self.dynamics, x_aug, integration_time, method='euler', options={'step_size': dt})
-            out = odeint(self.dynamics, x_aug, integration_time, method='dopri5', rtol=0.001, atol=0.001)
-
-            # i need to put the out into the odeint for the adj_out
-            # adj_out = odeint(self.adj_dynamics, torch.eye(x.shape[0]), torch.flip(integration_time,[0]), method='euler', options={'step_size': dt}) #this is new for the adjoint
+        out = odeint(self.dynamics, x_aug, integration_time, method='dopri5', rtol=0.001, atol=0.001)
 
         if eval_times is None:
             return out[1]
