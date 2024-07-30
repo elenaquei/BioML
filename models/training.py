@@ -298,6 +298,107 @@ class maskedTrainer():
         return epoch_loss / len(data_loader)
 
 
+class easyTrainer():
+    """
+    Given an optimizer, we write the training loop for minimizing the functional.
+    We need several hyperparameters to define the different functionals.
+
+    ***
+    -- The boolean "turnpike" indicates whether we integrate the training error over [0,T]
+    where T is the time horizon intrinsic to the model.
+    -- The boolean "fixed_projector" indicates whether the output layer is given or trained
+    -- The float "bound" indicates whether we consider L1+Linfty reg. problem (bound>0.), or
+    L2 reg. problem (bound=0.). If bound>0., then bound represents the upper threshold for the
+    weights+biases.
+    -- eps: Set a strength for the extra loss term that penalizes the gradients of the original loss
+    -- The float eps_comp records the gradient of the standard loss even when robust training is not active (for comparison). Only to be used with eps = 0
+    ***
+    """
+
+    def __init__(self, model, optimizer, device,
+                 print_freq=10, record_freq=10, verbose=1, save_dir=None,
+                 l2_factor=0, db_type='l1'):
+        self.model = model
+        self.optimizer = optimizer
+        self.device = device
+        self.loss_func = nn.MSELoss()
+        self.print_freq = print_freq
+        self.record_freq = record_freq
+        self.steps = 0
+        self.save_dir = save_dir
+        self.verbose = verbose
+
+        self.histories = {'loss_history': [],
+                          'epoch_loss_history': []}
+        self.buffer = {'loss': []}
+        self.is_resnet = (type(self.model).__name__ == 'resnet')
+        self.is_nODE = (type(self.model).__name__ == 'nODE')
+        self.l2_factor = l2_factor
+        self.db_type = db_type
+
+    def train(self, data_loader, num_epochs):
+        for epoch in range(num_epochs):
+            avg_loss = self._train_epoch(data_loader)
+            if self.verbose:
+                print("Epoch {}: {:.3f}".format(epoch + 1, avg_loss))
+
+    def _train_epoch(self, data_loader):
+        epoch_loss = 0.
+
+        for i, (x_batch, y_batch) in enumerate(data_loader):
+            # if i == 0:
+            #     print('first data batch', x_batch[0], y_batch[0])
+            self.optimizer.zero_grad()
+            x_batch = x_batch.to(self.device)
+            y_batch = y_batch.to(self.device)
+
+            if self.is_resnet:
+                y_pred, _, _ = self.model(x_batch)
+            elif not self.is_nODE:
+                y_pred, _ = self.model(x_batch)
+            else:
+                y_pred = self.model(x_batch)
+            # # Classical empirical risk minimization
+            loss = self.loss_func(y_pred, y_batch)
+
+            if self.l2_factor > 0:
+                for param in self.model.parameters():
+                    l2_regularization = param.norm()
+                    loss += self.l2_factor * l2_regularization
+
+            loss.backward()
+            self.optimizer.step()
+
+            epoch_loss += loss.item()
+
+            if i % self.print_freq == 0:
+                if self.verbose > 1:
+                    print("\nIteration {}/{}".format(i, len(data_loader)))
+                    print("Loss: {:.3f}".format(loss))
+
+            self.buffer['loss'].append(loss.item())
+
+            # At every record_freq iteration, record mean loss and clear buffer
+            if self.steps % self.record_freq == 0:
+                self.histories['loss_history'].append(mean(self.buffer['loss']))
+
+                # Clear buffer
+                self.buffer['loss'] = []
+
+                # Save information in directory
+                if self.save_dir is not None:
+                    dir, id = self.save_dir
+                    with open('{}/losses{}.json'.format(dir, id), 'w') as f:
+                        json.dump(self.histories['loss_history'], f)
+
+            self.steps += 1
+
+        # Record epoch mean information
+        self.histories['epoch_loss_history'].append(epoch_loss / len(data_loader))
+
+        return epoch_loss / len(data_loader)
+
+
 def create_dataloader(data_type, batch_size=3000, noise=0.15, factor=0.15, random_state=1, shuffle=True,
                       plotlim=[-2, 2], label='scalar', system_size=None, system=None, Figure=True):
     label_types = ['scalar', 'vector']
@@ -500,24 +601,55 @@ def create_dataloader(data_type, batch_size=3000, noise=0.15, factor=0.15, rando
     return train, test
 
 
-def from_map_to_XYdataset(map, dim, batch_size=3000, plotlim=[0, 5], random_state=1, noise=0.15):
+def weights_to_dataset(integration_time, Gamma, Win=None, bin=None, Wout=None, bout=None):
+    dim = np.max(Gamma.shape)
+    if Win is None:
+        Win = np.eye(dim)
+    if bin is None:
+        bin = np.zeros([1, dim])
+    if Wout is None:
+        Wout = np.eye(dim)
+    if bout is None:
+        bout = np.zeros([1, dim]).T
+    Gamma_mat = np.diag(Gamma)
+
+    def x_vert(x):
+        if len(x.shape) == 2:
+            if x.shape[0] == 1:
+                return x.T
+        else:
+            x = x[None, :]
+            x = x_vert(x)
+        return x
+
+    def x_hor(x):
+        return x.squeeze()
+
+    rhs = lambda x, t: x_hor(np.matmul(Gamma_mat, x_vert(x)) + np.matmul(Wout, np.tanh(np.matmul(Win, x_vert(x)) + bin)) + bout)
+    map = lambda x: scipy.integrate.odeint(lambda val, t: rhs(val, t).squeeze(), x, [0, integration_time])[-1, :]
+    X, Y = from_map_to_XYdataset(map, dim)
+    train, test = from_numpyXY_to_dataloader(X, Y)
+    return train, test
+
+
+def from_map_to_XYdataset(map, dim, batch_size=3000, bounds=[0, 5], random_state=None, noise=0.):
     if random_state:
         g = torch.Generator()
         g.manual_seed(random_state)
 
     size = [batch_size, dim]  # dimension of the pytorch tensor to be generated
-    low, high = plotlim  # range of uniform distribution
+    low, high = bounds  # range of uniform distribution
 
     X = np.array(torch.distributions.uniform.Uniform(low, high).sample(size))
     Y = np.array([map(X[i, :]) for i in range(batch_size)])
-    Y += noise * torch.randn(Y.shape)
+    Y += noise * np.random.randn(Y.shape[0], Y.shape[1])
 
     return X, Y
 
 
-def from_numpyXY_to_dataloader(X, Y, random_state, label='vector'):
+def from_numpyXY_to_dataloader(X, Y, random_state=None, label='vector'):
+    g = torch.Generator()
     if random_state:
-        g = torch.Generator()
         g.manual_seed(random_state)
 
     X_train, X_test, y_train, y_test = train_test_split(X, Y, test_size=.2, random_state=random_state, shuffle=True)

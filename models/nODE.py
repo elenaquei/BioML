@@ -7,9 +7,11 @@ further adapted by Elena Queirolo
 ##------------#
 import torch
 import torch.nn as nn
-from torchdiffeq import odeint, odeint_adjoint
+from torchdiffeq import odeint
 from warnings import warn
 import numpy as np
+import matplotlib.pyplot as plt
+import networkx as nx
 
 # from adjoint_neural_ode import adj_Dynamics
 
@@ -99,12 +101,20 @@ class nODE(nn.Module):
         self.gamma_layer = nn.Linear(self.ODE_dim, self.ODE_dim).bias
         return
 
-    def set_weights(self, Gamma, Wout, bout, Win, bin):
-        self.gamma_layer = Gamma
-        self.inside_weights.weight = Win
-        self.inside_weights.bias = bin
-        self.outside_weights.weight = Wout
-        self.outside_weights.bias = bout
+    def set_weights(self, Gamma, Wout=None, bout=None, Win=None, bin=None):
+        self.gamma_layer = torch.nn.Parameter(torch.from_numpy(Gamma))
+        if Win is None:
+            self.inside_weights = None
+        else:
+            self.inside_weights.weight = torch.nn.Parameter(torch.from_numpy(Win))
+            self.inside_weights.bias = torch.nn.Parameter(torch.from_numpy(bin))
+
+        if Wout is None:
+            self.outside_weights = None
+        else:
+            self.outside_weights.weight = torch.nn.Parameter(torch.from_numpy(Wout))
+            self.outside_weights.bias = torch.nn.Parameter(torch.from_numpy(bout))
+
         return
 
     def set_nonlinearity(self, sigma, der_sigma):
@@ -130,7 +140,7 @@ class nODE(nn.Module):
             w2_t = self.outside_weights.weight
             b2_t = self.outside_weights.bias
             out = out.matmul(w2_t.t()) + b2_t
-        Gamma = torch.diagonal(self.gamma_layer)
+        Gamma = torch.diag(self.gamma_layer)
         out = x.matmul(Gamma) + out
         return out
 
@@ -138,6 +148,7 @@ class nODE(nn.Module):
         """
         The output of the class -> D_xf(x(t), u(t))
         """
+
         def rowKronecker(x_vector, y_matrix):
             temp = [x_vector[i].detach() * y_matrix[i, :].detach() for i in range(len(x))]
             result = torch.Tensor()
@@ -163,7 +174,7 @@ class nODE(nn.Module):
             w2_t = self.outside_weights[k].weight
             # b2_t = self.fc3_time[k].bias
             out = rowKronecker(self.non_linear_derivative(w1_t.matmul(x) + b1_t), w1_t)
-            out = w2_t.matmulå(out)
+            out = w2_t.matmul(out)
 
             # x.matmul(w1_t.t()) is the same as torch.matmul(w1_t,x) simple matrix-vector multiplication
         return out
@@ -178,18 +189,10 @@ class nODE(nn.Module):
             integration_interval = torch.tensor(time_intervals).float().type_as(x)
         else:
             integration_interval = torch.tensor(self.time_interval).float().type_as(x)
-        if self.first_layer_bool:
-            x_in = self.first_layer(x)
-        else:
-            x_in = x
         dt = self.compute_dt()
-        out = odeint(self.right_hand_side, x_in, integration_interval, method='euler', options={'step_size': dt})
+        out = odeint(self.right_hand_side, x, integration_interval, method='euler', options={'step_size': dt})
         out = out[1, :, :]
-        if self.last_layer_bool:
-            x_out = self.last_layer(out)
-        else:
-            x_out = out
-        return x_out
+        return out
 
     def forward_integration(self, x, integration_time=None):
         if integration_time is None:
@@ -217,25 +220,25 @@ class nODE(nn.Module):
         if architectures[self.architecture] < 1:
             if architectures[self.architecture] == -1:
                 string += str(
-                    'w(t)' + activation_string + '(x(t))+b(t)    over the interval ' + str(self.time_interval) + ',\n')
+                    'Gx + w' + activation_string + '(x(t))+b    over the interval ' + str(self.time_interval) + ',\n')
                 layer = self.inside_weights
             else:
                 string += str(
-                    activation_string + '(w(t)x(t)+b(t))    over the interval ' + str(self.time_interval) + '\n')
+                    'Gx + ' + activation_string + '(wx(t)+b)    over the interval ' + str(self.time_interval) + '\n')
                 layer = self.outside_weights
 
-            string += str(
-                'W = ' + str(layer.weight.detach().numpy()) + ',      b = ' + str(layer.bias.detach().numpy()) + '\n\n')
+            string += str('G = ' + str(self.gamma_layer.detach().numpy()) +
+                          ', W = ' + str(layer.weight.detach().numpy()) + ',      b = ' + str(
+                layer.bias.detach().numpy()) + '\n\n')
         else:
             string += str(
-                'w1(t)' + activation_string + '(w2(t)x(t)+b2(t))+b1(t)    over the interval ' + str(self.time_interval) + '\n')
-            for k in range(self.n_layers):
-                string += str(
-                    'W1 = ' + str(self.outside_weights.weight.detach().numpy()) + ',        b1 = ' +
-                    str(self.outside_weights.bias.detach().numpy()) + '\n\n')
-                string += str(
-                    'W2= ' + str(self.inside_weights.weight.detach().numpy()) + ',        b2 = ' +
-                    str(self.inside_weights.bias.detach().numpy()) + '\n\n')
+                'Gx + w1' + activation_string + '(w2x(t)+b2)+b1    over the interval ' + str(self.time_interval) + '\n')
+            string += str('G = ' + str(self.gamma_layer.detach().numpy()) +
+                          ', W1 = ' + str(self.outside_weights.weight.detach().numpy()) + ',        b1 = ' +
+                          str(self.outside_weights.bias.detach().numpy()) + '\n\n')
+            string += str(
+                'W2= ' + str(self.inside_weights.weight.detach().numpy()) + ',        b2 = ' +
+                str(self.inside_weights.bias.detach().numpy()) + '\n\n')
         return string
 
     def info(self):
@@ -262,6 +265,35 @@ class nODE(nn.Module):
 
         return out
 
+    def plot(self):
+        print('Warning: this is an experimental feature')
+        if self.architecture == 'both':
+            W = self.outside_weights.weight.matmul(self.inside_weights.weight)
+        elif self.architecture == 'inside_weights':
+            W = self.inside_weights.weight
+        else:
+            W = self.outside_weights.weight
+        values_log_W = torch.sort(torch.log(torch.abs(W.flatten())))[0]
+        treshold = values_log_W[torch.sort(values_log_W[1:] - values_log_W[:-1])[1][-1] + 1]
+        W_bool_activation = (W >= torch.exp(treshold))
+        activation_edges = [('x' + str(i), 'x' + str(j)) for i in range(self.ODE_dim) for j in range(self.ODE_dim) if
+                            W_bool_activation[i][j] == True]
+        W_bool_repr = (W <= -torch.exp(treshold))
+        repression_edges = [('x' + str(i), 'x' + str(j)) for i in range(self.ODE_dim) for j in range(self.ODE_dim) if
+                            W_bool_repr[i][j] == True]
+        G = nx.Graph()
+        G.add_edges_from(activation_edges)
+        G.add_edges_from(repression_edges)
+        pos = nx.spring_layout(G)
+        nx.draw_networkx_nodes(G, pos, cmap=plt.get_cmap('jet'), node_size=500)
+        nx.draw_networkx_labels(G, pos)
+        nx.draw_networkx_edges(G, pos, edgelist=activation_edges, edge_color='g', arrows=True,
+                               connectionstyle="arc3,rad=0.2")
+        nx.draw_networkx_edges(G, pos, edgelist=repression_edges, edge_color='r', arrows=True,
+                               connectionstyle="arc3,rad=0.2")
+        plt.show()
+        return
+
 
 def grad_loss_inputs(model, data_inputs, data_labels, loss_module):
     data_inputs.requires_grad = True
@@ -275,3 +307,19 @@ def grad_loss_inputs(model, data_inputs, data_labels, loss_module):
     data_inputs_grad = torch.autograd.grad(loss, data_inputs)[0]
     data_inputs.requires_grad = False
     return data_inputs_grad
+
+
+def make_nODE_from_parameters(Gamma, Win=None, bin=None, Wout=None, bout=None):
+    dim = np.max(Gamma.shape)
+    if Win is None:
+        if Wout is None:
+            architecture = 'both'
+        else:
+            architecture = 'outside_weights'
+    elif Wout is None:
+        architecture = 'inside_weights'
+    else:
+        architecture = 'both'
+    node = nODE(dim, architecture=architecture)
+    node.set_weights(Gamma, Wout=Wout, bout=bout, Win=Win, bin=bin)
+    return node
