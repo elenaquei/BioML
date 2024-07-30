@@ -2,15 +2,15 @@ import torch
 import numpy as np
 from models.training import easyTrainer, weights_to_dataset
 from models.nODE import nODE, make_nODE_from_parameters
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+device = 'cpu'#torch.device('cuda' if torch.cuda.is_available() else 'cpu')''
 
 
 
 ODE_dim = 2
-Gamma = np.array([-1., -2.])
+Gamma = np.array([-1., -1.])
 integration_time = 3
-Win = np.array([[0, -1.2], [-3.1, 0]])
-bin = np.array([[0.2], [0.3]])
+Win = np.array([[0, -1.], [-2., 0]])
+bin = np.array([[2.], [2.]])
 
 node2 = make_nODE_from_parameters(Gamma, Win=Win, bin=bin)
 node2.plot()
