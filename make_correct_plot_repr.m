@@ -22,7 +22,7 @@ l_inside = inside - 1.96*sqrt(inside.*(1-inside)/100);
 e_inside = [l_inside,fliplr(h_inside)];
 
 % mask11 = [];
-% for k=2:10
+% for k=2:5
 %     load(['mask11_n',num2str(k),'.mat']);
 %     [p_av,p_cnt,p_min,p_split,correct,rho_av,rho_cnt,rho_min,A] = evaluate_fits(X,l,symm,offdiag,W1,0);
 %     mask11 = [mask11, correct];
@@ -61,8 +61,9 @@ hold on
 % fill(x2,e_mask11_22,'m','FaceAlpha',0.1)
 % hold on
 % fill(x2,e_restr,'b','FaceAlpha',0.1)
-legend('Known dynamics','No mask','Mask all undesired elements')
-ylabel('Fraction of fits with negative feedback loop')
-xlabel('Amount of data points')
+legend('Model known','General','General + mask','FontSize',14)
+ylabel('Success rate','FontSize',14)
+xlabel('Amount of time series','FontSize',14)
+ax = gca;
+ax.FontSize = 14; 
 ylim([0,1]);
-fontsize(fig, 14, "points")

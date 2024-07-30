@@ -436,7 +436,7 @@ def create_dataloader(data_type, batch_size=3000, noise=0.15, factor=0.15, rando
             z_dot = - z + 2 + 2*np.tanh(-y + 2)
             return np.array([x_dot, y_dot, z_dot])
 
-        deltat = 2.0
+        deltat = 1.0
 
         y = np.array([scipy.integrate.odeint(repressilator, X[i, :], [0, deltat])[-1, :] for i in range(batch_size)])
 
@@ -449,6 +449,82 @@ def create_dataloader(data_type, batch_size=3000, noise=0.15, factor=0.15, rando
         X += noise * torch.randn(X.shape)
 
 
+    else:
+        print('datatype not supported')
+        return None, None
+
+    if label == 'vector':
+        if data_type == 'TS' or data_type == 'repr' or data_type == 'restrictedTS' or data_type == 'restrictedTS_alt' or data_type == 'repr_alt':
+            print('No change  applied to TS or repr data')
+            # y = np.array([(1., 0.) if label == 1 else (0., 1.) for label in y])
+        else:
+            y = np.array([(2., 0.) if label == 1 else (-2., 0.) for label in y])
+
+    g = torch.Generator()
+    g.manual_seed(random_state)
+
+    # X = StandardScaler().fit_transform(X)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=.2, random_state=random_state, shuffle=shuffle)
+
+    # forego making train and test datasets for restricted dynamics
+    if data_type == 'restrictedTS' or data_type == 'restrictedTS_alt' or data_type == 'repr_alt':
+        X_test, X_train = X, X
+        y_train, y_test = y, y
+
+    X_train = torch.Tensor(X_train)  # transform to torch tensor for dataloader
+    y_train = torch.Tensor(y_train)  # transform to torch tensor for dataloader
+
+    X_test = torch.Tensor(X_test)  # transform to torch tensor for dataloader
+    y_test = torch.Tensor(y_test)  # transform to torch tensor for dataloader
+
+    if label == 'scalar':
+        X_train = X_train.type(torch.float32)  # type of orginial pickle.load data
+        y_train = y_train.type(torch.int64)  # dtype of original picle.load data
+
+        X_test = X_test.type(torch.float32)  # type of orginial pickle.load data
+        y_test = y_test.type(torch.int64)  # dtype of original picle.load data
+
+    else:
+        X_train = X_train.type(torch.float32)  # type of orginial pickle.load data
+        y_train = y_train.type(torch.float32)  # dtype of original picle.load data
+
+        X_test = X_test.type(torch.float32)  # type of orginial pickle.load data
+        y_test = y_test.type(torch.float32)  # dtype of original picle.load data
+
+    train_data = TensorDataset(X_train, y_train)  # create your datset
+    test_data = TensorDataset(X_test, y_test)
+
+    train = DataLoader(train_data, batch_size=64, shuffle=shuffle, generator=g)
+    test = DataLoader(test_data, batch_size=256, shuffle=shuffle, generator=g)  # 128 before
+
+    return train, test, X_train
+
+def create_dataloader_param(data_type,A,c, batch_size=3000, noise=0.15, factor=0.15, random_state=1, shuffle=True,
+                      plotlim=[-2, 2], label='scalar'):
+    label_types = ['scalar', 'vector']
+    if label not in label_types:
+        raise ValueError("Invalid label type. Expected one of: %s" % label_types)
+    
+    if data_type == 'repr_alt':
+        size = [batch_size, 3]  # dimension of the pytorch tensor to be generated
+        low, high = plotlim  # range of uniform distribution
+
+        X = np.array(torch.distributions.uniform.Uniform(low, high).sample(size))
+
+
+        def repressilator(xyz, t):
+            x, y, z = xyz[0], xyz[1], xyz[2]
+            inp = np.matmul(np.transpose(A),[[x],[y],[z]])
+            x_dot = - x + 2 + c*np.tanh(-inp[0] + 2)
+            y_dot = - y + 2 + 2*np.tanh(-inp[1] + 2)
+            z_dot = - z + 2 + 2*np.tanh(-inp[2] + 2)
+            return np.array([x_dot[0], y_dot[0], z_dot[0]])
+
+        deltat = 1.0
+
+        y = np.array([scipy.integrate.odeint(repressilator, X[i, :], [0, deltat])[-1, :] for i in range(batch_size)])
+
+        #X = torch.abs(torch.from_numpy(X) + noise * torch.randn(X.shape))
     else:
         print('datatype not supported')
         return None, None

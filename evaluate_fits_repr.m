@@ -87,7 +87,12 @@ for k=1:N
     
     % check if correct relation between x,y,z is found
     W = [W1(k,1,1),W1(k,1,2),W1(k,1,3);W1(k,2,1),W1(k,2,2),W1(k,2,3);W1(k,3,1),W1(k,3,2),W1(k,3,3)];
-    correct = correct + double(W(2,1)<-0.5 && W(3,2)<-0.5 && W(1,3) < -0.5);
+    W2 = abs(W);
+    W2(2,1) = 0;
+    W2(3,2) = 0;
+    W2(1,3) = 0;
+    
+    correct = correct + double(W(2,1)<-0.5 && W(3,2)<-0.5 && W(1,3) < -0.5 && max(max(W2))<0.5);
 end
 
 correct = correct/N;

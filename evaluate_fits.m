@@ -123,6 +123,7 @@ if plt
     xticklabels({0    0.7143    1.4286    2.1429    2.8571    3.5714    4.2857    5.0000})
     yticklabels({5.0000    4.2857    3.5714    2.8571    2.1429    1.4286    0.7143         0})
     title('Position of data points for good fits')
+    colorbar()
     
     [dat2,edges2] = histcounts2(x_gr_c,y_gr_c,15);
     figure

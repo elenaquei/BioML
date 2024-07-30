@@ -51,10 +51,7 @@ plot(x,restricted,LineWidth=2)
 hold on
 plot(x,inside,LineWidth=2);
 hold on
-plot(x,mask11,LineWidth=2);
-hold on
 plot(x,mask11_22,LineWidth=2);
-hold on
 % x2 = [x,fliplr(x)];
 % fill(x2,e_inside,'r','FaceAlpha',0.1)
 % hold on
@@ -63,8 +60,9 @@ hold on
 % fill(x2,e_mask11_22,'m','FaceAlpha',0.1)
 % hold on
 % fill(x2,e_restr,'b','FaceAlpha',0.1)
-legend('Known dynamics','No mask','Mask one self-activation/inhibition','Mask all self-activation/inhibition')
-ylabel('Fraction of fits with correct relation x,y')
-xlabel('Amount of data points')
-ylim([0,1]);
+legend('Model known','General','General + mask','FontSize',14)
+ylabel('Success rate','FontSize',14)
+xlabel('Amount of data points','FontSize',14)
+ax = gca;
+ax.FontSize = 14;
 fontsize(fig, 14, "points")
