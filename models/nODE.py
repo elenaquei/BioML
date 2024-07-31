@@ -108,7 +108,6 @@ class nODE(nn.Module):
         else:
             self.inside_weights.weight = torch.nn.Parameter(torch.from_numpy(Win))
             self.inside_weights.bias = torch.nn.Parameter(torch.from_numpy(bin))
-
         if Wout is None:
             self.outside_weights = None
         else:
@@ -257,8 +256,11 @@ class nODE(nn.Module):
         self.outside_weights = linear_layer
         return
 
-    def trajectory(self, x, n_evals=100):
-        time_intervals = torch.linspace(self.time_interval[0], self.time_interval[1], n_evals)
+    def trajectory(self, x, n_evals=100, time_interval = None):
+        if time_interval == None:
+            time_intervals = torch.linspace(self.time_interval[0], self.time_interval[1], n_evals)
+        else:
+            time_intervals = torch.linspace(time_interval[0], time_interval[1], n_evals)
         integration_interval = time_intervals.clone().detach().float().type_as(x)
 
         dt = self.compute_dt()
@@ -295,22 +297,42 @@ class nODE(nn.Module):
         plt.show()
         return
     
-    def phase_portrait(self, dim1=0, dim2=1, range1=[0,5], range2=[0,5], gridpoints=10):
+    def phase_portrait(self, dim1=0, dim2=1, dim3=None, range1=[0,5], range2=[0,5], range3 = [0,5], gridpoints=10, time_interval = None):
         print('Plot phase portrait based on current nODE parameters..')
         x0 = torch.zeros(self.ODE_dim)
-        
+            
         xv = np.arange(range1[0],range1[1],(range1[1]-range1[0])/gridpoints)
         xv = np.append(xv,range1[1])
 
         yv = np.arange(range2[0],range2[1],(range2[1]-range2[0])/gridpoints)
-        yv = np.append(yv,range1[1])
+        yv = np.append(yv,range2[1])
+
+        if dim3 != None:
+            zv = np.arange(range3[0],range3[1],(range3[1]-range3[0])/gridpoints)
+            zv = np.append(zv,range3[1])
+
+            fig = plt.figure()
+            ax = fig.add_subplot(projection = '3d')
+
+            for x in xv:
+                for y in yv:
+                    for z in zv:
+                        x0[dim1] = x
+                        x0[dim2] = y
+                        x0[dim3] = z
+                        
+                        traj = self.trajectory(x0, time_interval = time_interval).detach().numpy()
+                        
+                        ax.plot(traj[:,dim1],traj[:,dim2],traj[:,dim3])
+            plt.show()
+            return
         
         for x in xv:
             for y in yv:
                 x0[dim1] = x
                 x0[dim2] = y
-                traj = self.trajectory(x0).detach().numpy()
-                plt.plot(traj[:,0],traj[:,1])
+                traj = self.trajectory(x0, time_interval = time_interval).detach().numpy()
+                plt.plot(traj[:,dim1],traj[:,dim2])
         
         plt.show()
         return
