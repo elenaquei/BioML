@@ -1,8 +1,5 @@
-
 *.png
-
 .idea/
-
+output/
 *.mat
-
 *.pyc
