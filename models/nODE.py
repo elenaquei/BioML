@@ -215,6 +215,7 @@ class nODE(nn.Module):
 
     def __str__(self):
         """a __str__ function for readability with print statements"""
+        print(self.architecture)
         activation_string = [i for i in activations if activations[i] == self.non_linearity][0]
         string = str()
         if architectures[self.architecture] < 1:
@@ -293,6 +294,29 @@ class nODE(nn.Module):
                                connectionstyle="arc3,rad=0.2")
         plt.show()
         return
+    
+    def phase_portrait(self, dim1=0, dim2=1, range1=[0,5], range2=[0,5], gridpoints=10):
+        print('Plot phase portrait based on current nODE parameters..')
+        x0 = torch.zeros(self.ODE_dim)
+        
+        xv = np.arange(range1[0],range1[1],(range1[1]-range1[0])/gridpoints)
+        xv = np.append(xv,range1[1])
+
+        yv = np.arange(range2[0],range2[1],(range2[1]-range2[0])/gridpoints)
+        yv = np.append(yv,range1[1])
+        
+        for x in xv:
+            for y in yv:
+                x0[dim1] = x
+                x0[dim2] = y
+                traj = self.trajectory(x0).detach().numpy()
+                plt.plot(traj[:,0],traj[:,1])
+        
+        plt.show()
+        return
+                
+
+
 
 
 def grad_loss_inputs(model, data_inputs, data_labels, loss_module):
