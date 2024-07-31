@@ -102,17 +102,17 @@ class nODE(nn.Module):
         return
 
     def set_weights(self, Gamma, Wout=None, bout=None, Win=None, bin=None):
-        self.gamma_layer = torch.nn.Parameter(torch.from_numpy(Gamma))
+        self.gamma_layer = torch.nn.Parameter(torch.from_numpy(Gamma).float())
         if Win is None:
             self.inside_weights = None
         else:
-            self.inside_weights.weight = torch.nn.Parameter(torch.from_numpy(Win))
-            self.inside_weights.bias = torch.nn.Parameter(torch.from_numpy(bin))
+            self.inside_weights.weight = torch.nn.Parameter(torch.from_numpy(Win).float())
+            self.inside_weights.bias = torch.nn.Parameter(torch.from_numpy(bin).float())
         if Wout is None:
             self.outside_weights = None
         else:
-            self.outside_weights.weight = torch.nn.Parameter(torch.from_numpy(Wout))
-            self.outside_weights.bias = torch.nn.Parameter(torch.from_numpy(bout))
+            self.outside_weights.weight = torch.nn.Parameter(torch.from_numpy(Wout).float())
+            self.outside_weights.bias = torch.nn.Parameter(torch.from_numpy(bout).float())
 
         return
 
@@ -126,19 +126,23 @@ class nODE(nn.Module):
         return
 
     def right_hand_side(self, t, x):
-        if architectures[self.architecture] == 1:  # outside architecture ahs no inside layer
+        if architectures[self.architecture] == 0:  # outside architecture ahs no inside layer
             out = x
         else:
             w1_t = self.inside_weights.weight
             b1_t = self.inside_weights.bias
-            out = x.matmul(w1_t.t()) + b1_t
+            out = x.matmul(w1_t.t()) + b1_t.t()
         out = self.non_linearity(out)
-        if architectures[self.architecture] == 0:  # inside architecture has no outside layer
+        if architectures[self.architecture] == -1:  # inside architecture has no outside layer
             out = out
         else:
             w2_t = self.outside_weights.weight
             b2_t = self.outside_weights.bias
-            out = out.matmul(w2_t.t()) + b2_t
+            #print(out)
+            #print(w2_t.t())
+            #print(out.matmul(w2_t.t()))
+            out = out.matmul(w2_t.t()) + b2_t.t()
+            #print(out)
         Gamma = torch.diag(self.gamma_layer)
         out = x.matmul(Gamma) + out
         return out
