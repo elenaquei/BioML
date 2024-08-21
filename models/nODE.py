@@ -201,20 +201,11 @@ class nODE(nn.Module):
         if integration_time is None:
             time_intervals = torch.tensor([self.time_interval[0], self.time_interval[1]])
         else:
-            time_intervals = torch.tensor([integration_time[0], integration_time[1]])
+            time_intervals = torch.tensor(integration_time)
         integration_interval = torch.tensor(time_intervals).float().type_as(x)
-        if self.first_layer_bool:
-            x_in = self.first_layer(x)
-        else:
-            x_in = x
         dt = self.compute_dt()
-        out = odeint(self.right_hand_side, x_in, integration_interval, method='euler', options={'step_size': dt})
-        out = out[1, :, :]
-        if self.last_layer_bool:
-            x_out = self.last_layer(out)
-        else:
-            x_out = out
-        return x_out
+        out = odeint(self.right_hand_side, x, integration_interval, method='euler', options={'step_size': dt})
+        return out
 
     def __str__(self):
         """a __str__ function for readability with print statements"""

@@ -7,11 +7,11 @@ device = 'cpu'#torch.device('cuda' if torch.cuda.is_available() else 'cpu')''
 
 
 
-ODE_dim = 3
+ODE_dim = 2
 Gamma = np.array([-1., -1.])
 integration_time = 1
 Win = np.array([[0, -1.], [-1., 0]])
-Wout = 2*np.eye(3)
+Wout = 2*np.eye(2)
 bin = np.array([[2.], [2.]])
 bout = np.array([[2.], [2.]])
 

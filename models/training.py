@@ -166,7 +166,7 @@ def from_map_to_XYdataset(map, dim, batch_size=3000, bounds=[0, 5], random_state
     low, high = bounds  # range of uniform distribution
 
     X = np.array(torch.distributions.uniform.Uniform(low, high).sample(size))
-    Y = np.array([map(X[i, :]) for i in range(batch_size)])
+    Y = [map(np.squeeze(X[i, :])) for i in range(batch_size)]
     Y += noise * np.random.randn(Y.shape[0], Y.shape[1])
 
     return X, Y
