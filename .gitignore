@@ -1,5 +1,6 @@
 *.png
 .idea/
 output/
+plots/
 *.mat
 *.pyc
