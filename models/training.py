@@ -177,7 +177,7 @@ def from_numpyXY_to_dataloader(X, Y, random_state=None, label='vector'):
     if random_state:
         g.manual_seed(random_state)
 
-    X_train, X_test, y_train, y_test = train_test_split(X, Y, test_size=.2, random_state=random_state, shuffle=True)
+    X_train, X_test, y_train, y_test = train_test_split(X, Y, test_size=.5, random_state=random_state, shuffle=True)
 
     X_train = torch.Tensor(X_train)  # transform to torch tensor for dataloader
     y_train = torch.Tensor(y_train)  # transform to torch tensor for dataloader
