@@ -16,11 +16,12 @@ def infty_bound(model: nODE):
         for i in range(model.ODE_dim):
             sum_w = interval(0)
             for j in range(model.ODE_dim):
-                sum_w += interval(Wout[i, j])*interval_x
-            x_int = interval(-1/gamma[i]) * (interval(bout[i]) + sum_w)
+                sum_w += interval(Wout[i, j]) * interval_x
+            x_int = interval(-1 / gamma[i]) * (interval(bout[i]) + sum_w)
             x_bound[i, 0] = x_int[0].inf
             x_bound[i, 1] = x_int[0].sup
         return x_bound
+
     tanh_bound = interval([-1, 1])
     gamma, Win, bin, Wout, bout = model.get_weights()
     infty_bound = prod_loc(gamma.detach().numpy(), bout.detach().numpy(), Wout.detach().numpy(), tanh_bound)
@@ -76,7 +77,7 @@ def Newton(t, x_loc, F, DF=None, *parameters):
     return x_new
 
 
-class Model:
+class Fitting:
     def __init__(self, node: nODE):
         self.dimODE = node.ODE_dim
 
@@ -89,6 +90,7 @@ class Model:
             x_torch = torch.from_numpy(x).float()
             y = node.derivative(t, x_torch).detach().numpy()
             return y
+
         self.F = lambda t, x: F_node(t, x)
         self.DF = lambda t, x: DF_node(t, x)
 
@@ -102,7 +104,7 @@ class Model:
 def fixed_point_ranking(true_model, found_model):
     true_num_fp = num_fixed_points(true_model)
     found_num_fp = num_fixed_points(found_model)
-    grade = 1 - np.abs(true_num_fp - found_num_fp)/true_num_fp
+    grade = 1 - np.abs(true_num_fp - found_num_fp) / true_num_fp
     return grade
 
 
@@ -114,15 +116,34 @@ def network_ranking(true_nODE: nODE, found_nODE: nODE):
     return ranking_network
 
 
-if __name__ == "__main__":
+def numpify(a):
+    return [x.detach().numpy() for x in a]
 
+
+def parameter_ranking(true_nODE: nODE, found_nODE: nODE):
+    def norm(vecORmat):
+        return np.linalg.norm(vecORmat)
+
+    gamma_T, W1_T, b1_T, W2_T, b2_T = true_nODE.get_weights()
+    gamma_T, W1_T, b1_T, W2_T, b2_T = numpify([gamma_T, W1_T, b1_T, W2_T, b2_T])
+    gamma_F, W1_F, b1_F, W2_F, b2_F = found_nODE.get_weights()
+    gamma_F, W1_F, b1_F, W2_F, b2_F = numpify([gamma_F, W1_F, b1_F, W2_F, b2_F])
+    selected_pars_T = np.append(np.append(gamma_T, np.array([norm(W1_T), norm(b1_T), norm(W2_T)])), b2_T)
+    selected_pars_F = np.append(np.append(gamma_F, np.array([norm(W1_F), norm(b1_F), norm(W2_F)])), b2_F)
+    scaling = norm(selected_pars_T) / norm(selected_pars_F)
+    ranking = max(1 - norm(+scaling * selected_pars_F - selected_pars_T) / norm(selected_pars_T),
+                  1 - norm(-scaling * selected_pars_F - selected_pars_T) / norm(selected_pars_T))
+    return ranking, scaling
+
+
+if __name__ == "__main__":
     Gamma = np.array([-1., -1.])
     Win = np.array([[0, -1], [-1, 0]]).astype(float)
     Wout = np.array([[2, 0], [0, 2]]).astype(float)
     bin = np.array([[2.], [2.]]).astype(float)
     bout = np.array([[2.], [2.]]).astype(float)
     TS_bistable = make_nODE_from_parameters(Gamma, Win=Win, bin=bin, Wout=Wout, bout=bout)
-    true_model = Model(TS_bistable)
+    true_model = Fitting(TS_bistable)
 
     ODE_dim = 2
     Gamma = np.array([-1., -1.])
@@ -132,7 +153,7 @@ if __name__ == "__main__":
     bin = np.array([[2.], [-2.]]).astype(float)
     bout = np.array([[2.], [2.]]).astype(float)
     node2 = make_nODE_from_parameters(Gamma, Win=Win, bin=bin, Wout=Wout, bout=bout)
-    found_model = Model(node2)
+    found_model = Fitting(node2)
 
     fp = num_fixed_points(found_model)
     print("found model number of fixed points : ", fp)
@@ -143,5 +164,8 @@ if __name__ == "__main__":
     A = node2.adjacency_matrix()
     B = TS_bistable.adjacency_matrix()
 
-    ranking_network = 1 - np.linalg.norm(A - B)/np.linalg.norm(B)
+    ranking_network = 1 - np.linalg.norm(A - B) / np.linalg.norm(B)
     print('network raking : ', ranking_network)
+
+    pr, scaling = parameter_ranking(TS_bistable, node2)
+    print("parameter ranking : ", pr, ' with rescaling : ', scaling)
