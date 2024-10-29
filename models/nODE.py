@@ -12,6 +12,7 @@ from warnings import warn
 import numpy as np
 import matplotlib.pyplot as plt
 import networkx as nx
+import scipy
 
 # from adjoint_neural_ode import adj_Dynamics
 
@@ -116,6 +117,22 @@ class nODE(nn.Module):
 
         return
 
+    def get_weights(self):
+        if self.architecture != "outside":
+            W1 = self.inside_weights.weight
+            b1 = self.inside_weights.bias
+        else:
+            W1 = torch.from_numpy(np.identity(self.ODE_dim))
+            b1 = torch.from_numpy(np.zeros(self.ODE_dim))
+
+        if self.architecture != "inside":
+            W2 = self.outside_weights.weight
+            b2 = self.outside_weights.bias
+        else:
+            W2 = torch.from_numpy(np.identity(self.ODE_dim))
+            b2 = torch.from_numpy(np.zeros(self.ODE_dim))
+        return self.gamma_layer, W1, b1, W2, b2
+
     def set_nonlinearity(self, sigma, der_sigma):
         self.non_linearity = sigma
         self.non_linear_derivative = der_sigma
@@ -138,11 +155,11 @@ class nODE(nn.Module):
         else:
             w2_t = self.outside_weights.weight
             b2_t = self.outside_weights.bias
-            #print(out)
-            #print(w2_t.t())
-            #print(out.matmul(w2_t.t()))
+            # print(out)
+            # print(w2_t.t())
+            # print(out.matmul(w2_t.t()))
             out = out.matmul(w2_t.t()) + b2_t.t()
-            #print(out)
+            # print(out)
         Gamma = torch.diag(self.gamma_layer)
         out = x.matmul(Gamma) + out
         return out
@@ -158,28 +175,28 @@ class nODE(nn.Module):
             result = torch.cat(temp, out=result).reshape(y_matrix.shape)
             return result
 
-        k = self.layer_selection(t)
         if architectures[self.architecture] == 0:
-            w_t = self.outside_weights[k].weight
-            b_t = self.outside_weights[k].bias
+            w_t = self.outside_weights.weight
+            b_t = self.outside_weights.bias
             # w(t)\sigma(x(t))+b(t)  inner
             # # #     -> derivative is w(t)\sigma'(x(t))
             out = w_t.matmul(torch.diag(self.non_linear_derivative(x)))
         elif architectures[self.architecture] == -1:
-            w_t = self.inside_weights[k].weight
-            b_t = self.inside_weights[k].bias
-            out = rowKronecker(self.non_linear_derivative(w_t.matmul(x) + b_t), w_t)
+            w_t = self.inside_weights.weight
+            b_t = self.inside_weights.bias
+            out = rowKronecker(self.non_linear_derivative(x.matmul(w_t.t()) + b_t.t()), w_t)
         else:
             # w1(t)\sigma(w2(t)x(t)+b2(t))+b1(t) bottle-neck
             # # #     -> derivative is w1(t)\sigma'(w2(t)x(t)+b2(t))\row dy row kronecked product w2(t)
-            w1_t = self.inside_weights[k].weight
-            b1_t = self.inside_weights[k].bias
-            w2_t = self.outside_weights[k].weight
+            w1_t = self.inside_weights.weight
+            b1_t = self.inside_weights.bias
+            w2_t = self.outside_weights.weight
             # b2_t = self.fc3_time[k].bias
-            out = rowKronecker(self.non_linear_derivative(w1_t.matmul(x) + b1_t), w1_t)
+            out = torch.matmul(torch.diagflat(self.non_linear_derivative(x.matmul(w1_t.t()) + b1_t.t())), w1_t)
             out = w2_t.matmul(out)
 
             # x.matmul(w1_t.t()) is the same as torch.matmul(w1_t,x) simple matrix-vector multiplication
+        out += torch.diag(self.gamma_layer)
         return out
 
     def compute_dt(self):
@@ -209,7 +226,7 @@ class nODE(nn.Module):
 
     def __str__(self):
         """a __str__ function for readability with print statements"""
-        print(self.architecture)
+        # print(self.architecture)
         activation_string = [i for i in activations if activations[i] == self.non_linearity][0]
         string = str()
         if architectures[self.architecture] < 1:
@@ -251,8 +268,8 @@ class nODE(nn.Module):
         self.outside_weights = linear_layer
         return
 
-    def trajectory(self, x, n_evals=100, time_interval = None):
-        if time_interval == None:
+    def trajectory(self, x, n_evals=100, time_interval=None):
+        if time_interval is None:
             time_intervals = torch.linspace(self.time_interval[0], self.time_interval[1], n_evals)
         else:
             time_intervals = torch.linspace(time_interval[0], time_interval[1], n_evals)
@@ -291,23 +308,24 @@ class nODE(nn.Module):
                                connectionstyle="arc3,rad=0.2")
         plt.show()
         return
-    
-    def phase_portrait(self, dim1=0, dim2=1, dim3=None, range1=[0,5], range2=[0,5], range3 = [0,5], gridpoints=10, time_interval = None):
+
+    def phase_portrait(self, dim1=0, dim2=1, dim3=None, range1=[0, 5], range2=[0, 5], range3=[0, 5], gridpoints=10,
+                       time_interval=None):
         print('Plot phase portrait based on current nODE parameters..')
         x0 = torch.zeros(self.ODE_dim)
-            
-        xv = np.arange(range1[0],range1[1],(range1[1]-range1[0])/gridpoints)
-        xv = np.append(xv,range1[1])
 
-        yv = np.arange(range2[0],range2[1],(range2[1]-range2[0])/gridpoints)
-        yv = np.append(yv,range2[1])
+        xv = np.arange(range1[0], range1[1], (range1[1] - range1[0]) / gridpoints)
+        xv = np.append(xv, range1[1])
+
+        yv = np.arange(range2[0], range2[1], (range2[1] - range2[0]) / gridpoints)
+        yv = np.append(yv, range2[1])
 
         if dim3 != None:
-            zv = np.arange(range3[0],range3[1],(range3[1]-range3[0])/gridpoints)
-            zv = np.append(zv,range3[1])
+            zv = np.arange(range3[0], range3[1], (range3[1] - range3[0]) / gridpoints)
+            zv = np.append(zv, range3[1])
 
             fig = plt.figure()
-            ax = fig.add_subplot(projection = '3d')
+            ax = fig.add_subplot(projection='3d')
 
             for x in xv:
                 for y in yv:
@@ -315,23 +333,22 @@ class nODE(nn.Module):
                         x0[dim1] = x
                         x0[dim2] = y
                         x0[dim3] = z
-                        
-                        traj = self.trajectory(x0, time_interval = time_interval).detach().numpy()
-                        
-                        ax.plot(traj[:,dim1],traj[:,dim2],traj[:,dim3])
+
+                        traj = self.trajectory(x0, time_interval=time_interval).detach().numpy()
+
+                        ax.plot(traj[:, dim1], traj[:, dim2], traj[:, dim3])
             plt.show()
             return
-        
+
         for x in xv:
             for y in yv:
                 x0[dim1] = x
                 x0[dim2] = y
-                traj = self.trajectory(x0, time_interval = time_interval).detach().numpy()
-                plt.plot(traj[:,dim1],traj[:,dim2])
-        
+                traj = self.trajectory(x0, time_interval=time_interval).detach().numpy()
+                plt.plot(traj[:, dim1], traj[:, dim2])
+
         plt.show()
         return
-                
 
 
 
