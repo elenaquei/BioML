@@ -350,7 +350,19 @@ class nODE(nn.Module):
         plt.show()
         return
 
-
+    def adjacency_matrix(self):
+        if self.architecture == 'both':
+            W = self.outside_weights.weight.matmul(self.inside_weights.weight)
+        elif self.architecture == 'inside_weights':
+            W = self.inside_weights.weight
+        else:
+            W = self.outside_weights.weight
+        values_log_W = torch.sort(torch.log(torch.abs(W.flatten())))[0]
+        threshold = values_log_W[torch.sort(values_log_W[1:] - values_log_W[:-1])[1][-1] + 1]
+        W_bool_activation = (W >= torch.exp(threshold))
+        W_bool_repr = (W <= -torch.exp(threshold))
+        adjacency_mat = W_bool_activation.float() - W_bool_repr.float()
+        return adjacency_mat
 
 
 def grad_loss_inputs(model, data_inputs, data_labels, loss_module):

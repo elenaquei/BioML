@@ -106,6 +106,14 @@ def fixed_point_ranking(true_model, found_model):
     return grade
 
 
+def network_ranking(true_nODE: nODE, found_nODE: nODE):
+    true_network = true_nODE.adjacency_matrix()
+    found_network = found_nODE.adjacency_matrix()
+
+    ranking_network = 1 - np.linalg.norm(true_network - found_network) / np.linalg.norm(true_network)
+    return ranking_network
+
+
 if __name__ == "__main__":
 
     Gamma = np.array([-1., -1.])
@@ -131,3 +139,9 @@ if __name__ == "__main__":
 
     rank_dynamics = fixed_point_ranking(true_model, found_model)
     print("Ranking of found model : ", rank_dynamics)
+
+    A = node2.adjacency_matrix()
+    B = TS_bistable.adjacency_matrix()
+
+    ranking_network = 1 - np.linalg.norm(A - B)/np.linalg.norm(B)
+    print('network raking : ', ranking_network)
