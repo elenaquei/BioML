@@ -3,38 +3,56 @@ import numpy as np
 from models.training import easyTrainer, weights_to_dataset
 from models.nODE import nODE, make_nODE_from_parameters
 import matplotlib.pyplot as plt
-device = 'cpu'#torch.device('cuda' if torch.cuda.is_available() else 'cpu')''
 
+device = 'cpu'  # torch.device('cuda' if torch.cuda.is_available() else 'cpu')''
 
+if False:
+    ODE_dim = 2
+    Gamma = np.array([-1., -1.])
+    integration_time = 1
+    Win = np.array([[0, -1.], [-1., 0]])
+    Wout = 2 * np.eye(2)
+    bin = np.array([[2.], [2.]])
+    bout = np.array([[2.], [2.]])
 
-ODE_dim = 2
-Gamma = np.array([-1., -1.])
-integration_time = 1
-Win = np.array([[0, -1.], [-1., 0]])
-Wout = 2*np.eye(2)
-bin = np.array([[2.], [2.]])
-bout = np.array([[2.], [2.]])
+    node2 = make_nODE_from_parameters(Gamma, Win=Win, bin=bin, Wout=Wout, bout=bout)
+    # node2.plot()
+    # print('real Toggle Switch')
+    # print(node2)
 
-node2 = make_nODE_from_parameters(Gamma, Win=Win, bin=bin, Wout=Wout, bout=bout)
-#node2.plot()
-#print('real Toggle Switch')
-#print(node2)
+    train_data, test_data = weights_to_dataset(integration_time, Gamma, Win=Win, bin=bin, Wout=Wout, bout=bout,
+                                               batch_size=3000)
 
+    node = nODE(ODE_dim, architecture='both', time_interval=[0, integration_time])
 
-train_data, test_data = weights_to_dataset(integration_time, Gamma, Win=Win, bin=bin, Wout=Wout, bout=bout, batch_size = 3000)
+    optimizer_node = torch.optim.Adam(node.parameters(), lr=1e-1)
 
-node = nODE(ODE_dim, architecture='both', time_interval=[0, integration_time])
+    trainer = easyTrainer(node, optimizer_node, device)
 
-optimizer_node = torch.optim.Adam(node.parameters(), lr=1e-1)
+    trainer.train(train_data, 100)
 
-trainer = easyTrainer(node, optimizer_node, device)
+    node.plot()
+    print(node)
 
-trainer.train(train_data, 100)
+    traj = node.trajectory(torch.tensor([1.0, 2.0])).detach().numpy()
 
-node.plot()
-print(node)
+    node.phase_portrait()
 
-traj = node.trajectory(torch.tensor([1.0,2.0])).detach().numpy()
+### 5D repressilator
 
-node.phase_portrait()
+dim = 5
 
+gamma = - np.ones([dim])
+Wout = 2 * np.eye(dim)
+Win = np.zeros([dim, dim])
+for i in range(dim - 1):
+    Win[i, i + 1] = -1
+Win[dim - 1, 0] = -1
+bin, bout = 2 * np.ones([dim, 1]), 2 * np.ones([dim, 1])
+
+node_5Drepr = make_nODE_from_parameters(gamma, Win=Win, bin=bin, Wout=Wout, bout=bout)
+
+x = np.array([1., 2, 3, 4, 5])
+traj = node_5Drepr.trajectory(torch.tensor([1., 2, 3, 4, 5])).detach().numpy()
+
+print(traj)

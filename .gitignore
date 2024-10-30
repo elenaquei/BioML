@@ -4,3 +4,9 @@ output/
 plots/
 *.mat
 *.pyc
+
+julia/
+
+.ipynb_checkpoints/
+
+.DS_Store

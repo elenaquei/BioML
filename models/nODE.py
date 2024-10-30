@@ -393,3 +393,16 @@ def make_nODE_from_parameters(Gamma, Win=None, bin=None, Wout=None, bout=None):
     node = nODE(dim, architecture=architecture)
     node.set_weights(Gamma, Wout=Wout, bout=bout, Win=Win, bin=bin)
     return node
+
+
+def repressilator(dim=3):
+    gamma = - np.ones([dim])
+    Wout = 2 * np.eye(dim)
+    Win = np.zeros([dim, dim])
+    for i in range(dim - 1):
+        Win[i, i + 1] = -1
+    Win[dim - 1, 0] = -1
+    bin, bout = 2 * np.ones([dim, 1]), 2 * np.ones([dim, 1])
+
+    node_repr = make_nODE_from_parameters(gamma, Win=Win, bin=bin, Wout=Wout, bout=bout)
+    return node_repr
