@@ -50,6 +50,13 @@ def randomize_adjacency(adjacency, threshold=0.8):
     return noisy_adjacency
 
 
+def noisy_data(*data_list):
+    new_list = []
+    for i in range(len(data_list)):
+        new_list.append(data_list[i] + 0.01*torch.rand(data_list[i].size()))
+    return data_list
+
+
 class np_parameter_structure():
     def __init__(self, gamma, Win=None, Wout=None, bin=None, bout=None):
         self.gamma = gamma
@@ -257,10 +264,34 @@ def from_network_to_data(par_struct, n_data):
     gamma, Win, bin, Wout, bout = par_struct.get_parameters()
     node_2D = make_nODE_from_parameters(gamma, Win=Win, bin=bin, Wout=Wout, bout=bout)
 
-    u0 = rand_dim([n_data, dim])
-    uT = node_2D.trajectory(torch.from_numpy(u0).float()).detach().numpy()[-1, :, :]
+    u0 = torch.rand([n_data, dim])
+    uT = node_2D.forward(u0)
     return u0, uT
 
+
+def create_dataset(dim, n_data, n_networks=1):
+    def x_squish_data(u0, uT, Atilde):
+        x = torch.cat((u0, uT, Atilde.flatten()))
+        return x
+
+    def y_squish_data(uT, A):
+        y = torch.cat((uT, A.flatten()))
+        return y
+
+    x_exact = list()  # x_i = u0i, uTi, A.flatten
+    x_noisy = list()  # x_i = u0i_tilde, uTi_tilde, Atilde.flatten
+    y = list()  # y_i = uTi, A.flatten
+    p = list()  # p_i = torch_parameter_structure
+    for i in range(n_networks):
+        par_struct, adjacency = create_random_network(dim)
+        data_u0, data_uT = from_network_to_data(par_struct, n_data)
+        noisy_data_u0, noisy_data_uT = noisy_data(data_u0, data_uT)
+        noisy_adjacency = randomize_adjacency(adjacency)
+        x_noisy.append([x_squish_data(noisy_data_u0[i, :], noisy_data_uT[i, :], noisy_adjacency) for i in range(n_data)])
+        x_exact.append([x_squish_data(data_u0[i, :], data_uT[i, :], adjacency) for i in range(n_data)])
+        y.append([y_squish_data(data_uT[i, :], adjacency) for i in range(n_data)])
+        p.append(par_struct)
+    return x_exact, x_noisy, y, p
 
 
 if __name__ == "__main__":
@@ -289,5 +320,6 @@ if __name__ == "__main__":
     print(struct.get_parameters())
     struct.set_parameters(bin=bin)
     a = struct.get_vec_par()
-    print(a)
 
+    data = create_dataset(2, 5, 2)
+    print(data)
