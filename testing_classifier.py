@@ -8,7 +8,7 @@ from torch.utils.data import Dataset
 from torchdiffeq import odeint
 from data_creation import create_dataset
 
-x_train,x_noise,y_train,param = create_dataset(2,1,100)
+x_train, x_noise, y_train, param = create_dataset(2,1,100)
 
 
 class param_classifier(torch.nn.Module):
@@ -28,7 +28,33 @@ class param_classifier(torch.nn.Module):
         self.linears.extend(
             [torch.nn.Linear(layers_size[i - 1], layers_size[i]) for i in range(1, self.num_layers - 1)])
         self.linears.append(torch.nn.Linear(layers_size[-1], self.output_size))
+        # self.neuralODE = nODE(ode_dim, architecture='both', time_interval=[0, 1])
         return
+
+    def forward_integration(self, x, parameter, integration_time=None):
+        if integration_time is None:
+            time_intervals = torch.tensor([0., 1.])
+        else:
+            time_intervals = torch.tensor(integration_time)
+        integration_interval = torch.tensor(time_intervals).float().type_as(x)
+        dt = 0.01
+        out = odeint(lambda t, x : self.right_hand_side(t, x, parameter), x, integration_interval, method='euler', options={'step_size': dt})
+        return out[-1,:]
+
+    def right_hand_side(self, t, x, parameter):
+        """
+        w1_t = self.inside_weights.weight
+        b1_t = self.inside_weights.bias
+        out = x.matmul(w1_t.t()) + b1_t.t()
+        out = torch.nn.Tanh(out)
+        w2_t = self.outside_weights.weight
+        b2_t = self.outside_weights.bias
+        out = out.matmul(w2_t.t()) + b2_t.t()
+        Gamma = torch.diag(self.gamma_layer)
+        out = x.matmul(Gamma) + out
+        """
+        out = - torch.sum(parameter) * x + torch.tanh(x)
+        return out
 
     # forward pass of NN (both classifier and neural ODE)
     def forward(self, data):
@@ -49,7 +75,8 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 classifier = param_classifier(8, 2).to(device)
 ode_dim = 2
 integration_time = 1
-node = nODE(ode_dim, architecture='both', time_interval=[0, integration_time]).to(device)
+# node = nODE(ode_dim, architecture='both', time_interval=[0, integration_time]).to(device)
+# # replaced by classifier.neuralODE
 loss_fn = torch.nn.MSELoss()
 
 optimizer = torch.optim.Adam(classifier.parameters(), lr=1e-3)
@@ -82,10 +109,10 @@ for epoch in range(100):
         p = classifier(classifier_inp)
 
         # define ODE with found weights
-        node.set_vec_weights(p)
+        # classifier.neuralODE.set_vec_weights(p)
 
         # integrate ODE
-        ut_hat = node.forward(u0)
+        ut_hat = classifier.forward_integration(u0, p)
 
         """
         # estimate adjacency matrix from output of classifier network
@@ -93,10 +120,10 @@ for epoch in range(100):
 
         # add to loss: error between found adjacency and true adjacency
         loss = loss + loss_fn(A.flatten().float(), Ahat.flatten().float())
-
+        """
         # add to loss: error between found solution at time t and true solution
         loss = loss + loss_fn(ut_hat.float(), ut.float())
-        """
+
         loss += loss_fn(p, 0*p)
         # print('Epoch ' + str(epoch))
         # print(loss)
