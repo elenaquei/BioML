@@ -117,6 +117,23 @@ class nODE(nn.Module):
 
         return
 
+    def set_vec_weights(self, vec_weights):
+        dim_vec = (vec_weights.flatten().size())[0]
+        dim_float = (- 3 + torch.sqrt(torch.tensor(9 + 8 * dim_vec)))/4
+        if dim_float-dim_float.int() != 0:
+            raise ValueError('The given vector cannot have the right parameters')
+        dim = int(dim_float)
+        gamma = vec_weights[0:dim]
+        vec_weights = vec_weights[dim:]
+        Win = vec_weights[0:dim**2]
+        vec_weights = vec_weights[dim**2:]
+        vec_weights = vec_weights[dim:]
+        Wout = vec_weights[0:dim**2]
+        vec_weights = vec_weights[dim**2:]
+        bout = vec_weights
+        self.set_weights(gamma, Wout=Wout, bout=bout, Win=Win, bin=bin)
+        return
+
     def get_weights(self):
         if self.architecture != "outside":
             W1 = self.inside_weights.weight
