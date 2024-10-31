@@ -260,7 +260,7 @@ def create_random_network(dim):
     return par_struct, adjacency
 
 
-def from_network_to_data(par_struct, n_data):
+def from_network_to_data(par_struct, n_data, dim):
     gamma, Win, bin, Wout, bout = par_struct.get_parameters()
     node_2D = make_nODE_from_parameters(gamma, Win=Win, bin=bin, Wout=Wout, bout=bout)
 
@@ -284,7 +284,7 @@ def create_dataset(dim, n_data, n_networks=1):
     p = list()  # p_i = torch_parameter_structure
     for i in range(n_networks):
         par_struct, adjacency = create_random_network(dim)
-        data_u0, data_uT = from_network_to_data(par_struct, n_data)
+        data_u0, data_uT = from_network_to_data(par_struct, n_data, dim)
         noisy_data_u0, noisy_data_uT = noisy_data(data_u0, data_uT)
         noisy_adjacency = randomize_adjacency(adjacency)
         x_noisy.append([x_squish_data(noisy_data_u0[i, :], noisy_data_uT[i, :], noisy_adjacency) for i in range(n_data)])

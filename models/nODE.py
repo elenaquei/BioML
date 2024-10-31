@@ -103,33 +103,29 @@ class nODE(nn.Module):
         return
 
     def set_weights(self, Gamma, Wout=None, bout=None, Win=None, bin=None):
-        with torch.no_grad():
+        def become_torch(input):
+            if isinstance(input, (np.ndarray, np.generic)):
+                input = torch.from_numpy(input).float()
+            return input
 
-            def become_torch(input):
-                if isinstance(input, (np.ndarray, np.generic)):
-                    input = torch.from_numpy(input).float()
-                return input
-
-            self.gamma_layer = torch.nn.Parameter(become_torch(Gamma))
-            if Win is None:
-                self.inside_weights = None
-            else:
-                self.inside_weights.weight = torch.nn.Parameter(become_torch(Win))
-                self.inside_weights.bias = torch.nn.Parameter(become_torch(bin))
-            if Wout is None:
-                self.outside_weights = None
-            else:
-                self.outside_weights.weight = torch.nn.Parameter(become_torch(Wout))
-                self.outside_weights.bias = torch.nn.Parameter(become_torch(bout))
+        self.gamma_layer = torch.nn.Parameter(become_torch(Gamma), requires_grad=True)
+        if Win is not None:
+            self.inside_weights.weight = torch.nn.Parameter(become_torch(Win), requires_grad=True)
+            self.inside_weights.bias = torch.nn.Parameter(become_torch(bin), requires_grad=True)
+        if Wout is not None:
+            self.outside_weights.weight = torch.nn.Parameter(become_torch(Wout), requires_grad=True)
+            self.outside_weights.bias = torch.nn.Parameter(become_torch(bout), requires_grad=True)
 
         return
 
     def set_vec_weights(self, vec_weights):
         dim_vec = (vec_weights.flatten().size())[0]
-        dim_float = (- 3 + torch.sqrt(torch.tensor(9 + 8 * dim_vec)))/4
-        if dim_float-dim_float.int() != 0:
+        dim_float = (-3 + torch.sqrt(torch.tensor(9 + 8 * dim_vec))) / 4
+        if dim_float - dim_float.int() != 0:
             raise ValueError('The given vector cannot have the right parameters')
         dim = int(dim_float)
+
+        # Decompose the vector into the individual weights and biases
         gamma = vec_weights[0:dim]
         vec_weights = vec_weights[dim:]
         Win = torch.reshape(vec_weights[0:dim**2], [dim, dim])
@@ -139,6 +135,8 @@ class nODE(nn.Module):
         Wout = torch.reshape(vec_weights[0:dim**2], [dim, dim])
         vec_weights = vec_weights[dim**2:]
         bout = vec_weights
+
+        # Call set_weights without breaking the gradient flow
         self.set_weights(gamma, Wout=Wout, bout=bout, Win=Win, bin=bin)
         return
 
