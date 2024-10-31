@@ -103,17 +103,23 @@ class nODE(nn.Module):
         return
 
     def set_weights(self, Gamma, Wout=None, bout=None, Win=None, bin=None):
-        self.gamma_layer = torch.nn.Parameter(torch.from_numpy(Gamma).float())
+        def become_torch_Par(input):
+            if isinstance(input, (np.ndarray, np.generic)):
+                input = torch.from_numpy(input).float()
+            output = torch.nn.Parameter(input)
+            return output
+
+        self.gamma_layer = become_torch_Par(Gamma)
         if Win is None:
             self.inside_weights = None
         else:
-            self.inside_weights.weight = torch.nn.Parameter(torch.from_numpy(Win).float())
-            self.inside_weights.bias = torch.nn.Parameter(torch.from_numpy(bin).float())
+            self.inside_weights.weight = become_torch_Par(Win)
+            self.inside_weights.bias = become_torch_Par(bin)
         if Wout is None:
             self.outside_weights = None
         else:
-            self.outside_weights.weight = torch.nn.Parameter(torch.from_numpy(Wout).float())
-            self.outside_weights.bias = torch.nn.Parameter(torch.from_numpy(bout).float())
+            self.outside_weights.weight = become_torch_Par(Wout)
+            self.outside_weights.bias = become_torch_Par(bout)
 
         return
 

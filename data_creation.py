@@ -80,8 +80,9 @@ class np_parameter_structure():
             if np.size(vec)!=dim:
                 raise ValueError('Expected vector of length %i, got length %i instead', self.dim, np.size(vec))
             return
+
         def check_dim_mat(mat, dim):
-            if np.len(np.shape(mat))!=2 or any(np.shape(mat)!=np.shape(mat)[0]):
+            if len(np.shape(mat))!=2 or any([x!=np.shape(mat)[0] for x in np.shape(mat)]):
                 raise ValueError('Expected matrix, received %f instead', mat)
             if np.shape(mat)[0] != dim:
                 raise ValueError('Expected square matrix of size %i, got length %i instead', self.dim, np.size(vec))
@@ -119,8 +120,9 @@ class np_parameter_structure():
         return self.gamma, self.Win, self.bin, self.Wout, self.bout
 
     def get_vec_par(self):
-        vec_par = np.array([self.gamma.flatten(), self.Win.flatten(), self.bin.flatten(), self.Wout.flatten(),
-                            self.bout.flatten()])
+        vec_par = np.append(np.append(self.gamma.flatten(), self.Win.flatten()),
+                            np.append(np.append(self.bin.flatten(), self.Wout.flatten()),
+                            self.bout.flatten()))
         return vec_par
 
     def set_vec_par(self, vec_par):
@@ -237,6 +239,30 @@ class torch_parameter_structure():
         return
 
 
+def create_random_network(dim):
+    gamma = - np.abs(rand_dim(dim))
+    Wout = rand_dim([dim, dim])
+    Win = rand_dim([dim, dim])
+    bin, bout = rand_dim(dim), rand_dim(dim)
+
+    Win = random_zeros(Win, threshold=0.5)
+    Wout = random_zeros(Wout)
+
+    par_struct = np_parameter_structure(gamma, Win=Win, bin=bin, Wout=Wout, bout=bout)
+    adjacency = adjacency_matrix(np.matmul(Wout, Win))
+    return par_struct, adjacency
+
+
+def from_network_to_data(par_struct, n_data):
+    gamma, Win, bin, Wout, bout = par_struct.get_parameters()
+    node_2D = make_nODE_from_parameters(gamma, Win=Win, bin=bin, Wout=Wout, bout=bout)
+
+    u0 = rand_dim([n_data, dim])
+    uT = node_2D.trajectory(torch.from_numpy(u0).float()).detach().numpy()[-1, :, :]
+    return u0, uT
+
+
+
 if __name__ == "__main__":
     dim = 2
     n_data = 50
@@ -264,5 +290,4 @@ if __name__ == "__main__":
     struct.set_parameters(bin=bin)
     a = struct.get_vec_par()
     print(a)
-    print(struct)
 
