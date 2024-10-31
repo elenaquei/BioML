@@ -36,10 +36,10 @@ class param_classifier(torch.nn.Module):
             time_intervals = torch.tensor([0., 1.])
         else:
             time_intervals = torch.tensor(integration_time)
-        integration_interval = torch.tensor(time_intervals).float().type_as(x)
+        integration_interval = torch.tensor([0,1.]).float().type_as(x)
         dt = 0.01
         out = odeint(lambda t, x : self.right_hand_side(t, x, parameter), x, integration_interval, method='euler', options={'step_size': dt})
-        return out[-1,:]
+        return out[-1, :]
 
     def right_hand_side(self, t, x, parameter):
         """
@@ -125,8 +125,8 @@ for epoch in range(100):
         loss = loss + loss_fn(ut_hat.float(), ut.float())
 
         loss += loss_fn(p, 0*p)
-        # print('Epoch ' + str(epoch))
-        # print(loss)
+        print('Epoch ' + str(epoch))
+        print(loss)
 
     # backward propagation
     loss.backward(retain_graph=True)
