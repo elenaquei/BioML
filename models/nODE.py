@@ -123,17 +123,16 @@ class nODE(nn.Module):
         if dim_float-dim_float.int() != 0:
             raise ValueError('The given vector cannot have the right parameters')
         dim = int(dim_float)
-        self.gamma = vec_weights[0:dim]
+        gamma = vec_weights[0:dim]
         vec_weights = vec_weights[dim:]
         Win = vec_weights[0:dim**2]
-        self.Win = np.reshape(Win, [dim,dim])
         vec_weights = vec_weights[dim**2:]
-        self.bin = vec_weights[0:dim]
         vec_weights = vec_weights[dim:]
         Wout = vec_weights[0:dim**2]
-        self.Wout = np.reshape(Wout, [dim,dim])
         vec_weights = vec_weights[dim**2:]
-        self.bout = vec_weights[0:dim]
+        bout = vec_weights
+        self.set_weights(gamma, Wout=Wout, bout=bout, Win=Win, bin=bin)
+        return
 
     def get_weights(self):
         if self.architecture != "outside":
