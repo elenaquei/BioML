@@ -62,3 +62,5 @@ node1 = nODE(2)
 p = torch.tensor([1,2,3,4,5,6,7,8,9,10,11,12,13,14.3])
 node1.set_vec_weights(p)
 print(node1.get_weights())
+
+node1.forward(torch.tensor([1.2, 3.4]))

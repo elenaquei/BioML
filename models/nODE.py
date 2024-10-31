@@ -236,7 +236,12 @@ class nODE(nn.Module):
             integration_interval = torch.tensor(self.time_interval).float().type_as(x)
         dt = self.compute_dt()
         out = odeint(self.right_hand_side, x, integration_interval, method='euler', options={'step_size': dt})
-        out = out[1, :, :]
+        if return_features:
+            return out
+        if len(out.size()) == 3:
+            out = out[1, :, :]
+        else:
+            out = out[1, :]
         return out
 
     def forward_integration(self, x, integration_time=None):
