@@ -37,14 +37,15 @@ def randomize_adjacency(adjacency, threshold=0.8):
     # randomly remove  connections
     rand_mat = np.random.uniform(size=np.shape(adjacency))
     bool_mask = rand_mat > (1 - threshold)
-    print(bool_mask)
+    # print(bool_mask)
     noisy_adjacency = np.multiply(noisy_adjacency, bool_mask)
-    print(noisy_adjacency)
+
+    # print(noisy_adjacency)
 
     # randomly add unwanted connections
     rand_mat = np.random.uniform(size=np.shape(adjacency))
     bool_mask = rand_mat > threshold
-    print(bool_mask)
+    #print(bool_mask)
     noisy_adjacency += np.multiply(flipped_adjacency, bool_mask)
 
     return noisy_adjacency
