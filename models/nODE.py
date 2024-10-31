@@ -103,23 +103,24 @@ class nODE(nn.Module):
         return
 
     def set_weights(self, Gamma, Wout=None, bout=None, Win=None, bin=None):
-        def become_torch_Par(input):
-            if isinstance(input, (np.ndarray, np.generic)):
-                input = torch.from_numpy(input).float()
-            output = torch.nn.Parameter(input)
-            return output
+        with torch.no_grad():
 
-        self.gamma_layer = become_torch_Par(Gamma)
-        if Win is None:
-            self.inside_weights = None
-        else:
-            self.inside_weights.weight = become_torch_Par(Win)
-            self.inside_weights.bias = become_torch_Par(bin)
-        if Wout is None:
-            self.outside_weights = None
-        else:
-            self.outside_weights.weight = become_torch_Par(Wout)
-            self.outside_weights.bias = become_torch_Par(bout)
+            def become_torch(input):
+                if isinstance(input, (np.ndarray, np.generic)):
+                    input = torch.from_numpy(input).float()
+                return input
+
+            self.gamma_layer = torch.nn.Parameter(become_torch(Gamma))
+            if Win is None:
+                self.inside_weights = None
+            else:
+                self.inside_weights.weight = torch.nn.Parameter(become_torch(Win))
+                self.inside_weights.bias = torch.nn.Parameter(become_torch(bin))
+            if Wout is None:
+                self.outside_weights = None
+            else:
+                self.outside_weights.weight = torch.nn.Parameter(become_torch(Wout))
+                self.outside_weights.bias = torch.nn.Parameter(become_torch(bout))
 
         return
 
@@ -131,10 +132,11 @@ class nODE(nn.Module):
         dim = int(dim_float)
         gamma = vec_weights[0:dim]
         vec_weights = vec_weights[dim:]
-        Win = vec_weights[0:dim**2]
+        Win = torch.reshape(vec_weights[0:dim**2], [dim, dim])
         vec_weights = vec_weights[dim**2:]
+        bin = vec_weights[:dim]
         vec_weights = vec_weights[dim:]
-        Wout = vec_weights[0:dim**2]
+        Wout = torch.reshape(vec_weights[0:dim**2], [dim, dim])
         vec_weights = vec_weights[dim**2:]
         bout = vec_weights
         self.set_weights(gamma, Wout=Wout, bout=bout, Win=Win, bin=bin)

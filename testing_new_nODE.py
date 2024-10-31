@@ -38,21 +38,27 @@ if False:
 
     node.phase_portrait()
 
-### 5D repressilator
+if False:
+    ### 5D repressilator
 
-dim = 5
+    dim = 5
 
-gamma = - np.ones([dim])
-Wout = 2 * np.eye(dim)
-Win = np.zeros([dim, dim])
-for i in range(dim - 1):
-    Win[i, i + 1] = -1
-Win[dim - 1, 0] = -1
-bin, bout = 2 * np.ones([dim, 1]), 2 * np.ones([dim, 1])
+    gamma = - np.ones([dim])
+    Wout = 2 * np.eye(dim)
+    Win = np.zeros([dim, dim])
+    for i in range(dim - 1):
+        Win[i, i + 1] = -1
+    Win[dim - 1, 0] = -1
+    bin, bout = 2 * np.ones([dim, 1]), 2 * np.ones([dim, 1])
 
-node_5Drepr = make_nODE_from_parameters(gamma, Win=Win, bin=bin, Wout=Wout, bout=bout)
+    node_5Drepr = make_nODE_from_parameters(gamma, Win=Win, bin=bin, Wout=Wout, bout=bout)
 
-x = np.array([1., 2, 3, 4, 5])
-traj = node_5Drepr.trajectory(torch.tensor([1., 2, 3, 4, 5])).detach().numpy()
+    x = np.array([1., 2, 3, 4, 5])
+    traj = node_5Drepr.trajectory(torch.tensor([1., 2, 3, 4, 5])).detach().numpy()
 
-print(traj)
+    print(traj)
+
+node1 = nODE(2)
+p = torch.tensor([1,2,3,4,5,6,7,8,9,10,11,12,13,14.3])
+node1.set_vec_weights(p)
+print(node1.get_weights())
