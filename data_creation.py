@@ -173,6 +173,7 @@ class torch_parameter_structure():
             if torch.max(torch.tensor(vec.size())) !=dim:
                 raise ValueError('Expected vector of length %i, got length %i instead', self.dim, torch.size(vec))
             return
+
         def check_dim_mat(mat, dim):
             if len(mat.size())!=2 or any(mat.size()!=mat.size()[0]):
                 raise ValueError('Expected matrix, received %f instead', mat)
