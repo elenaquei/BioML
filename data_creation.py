@@ -189,7 +189,7 @@ class torch_parameter_structure():
             return
 
         def check_dim_mat(mat, dim):
-            if len(mat.size())!=2 or any(mat.size()!=mat.size()[0]):
+            if len(mat.size())!=2 or any([mat.size()[i]!=mat.size()[0] for i in range(2)]):
                 raise ValueError('Expected matrix, received %f instead', mat)
             if mat.size()[0] != dim:
                 raise ValueError('Expected square matrix of size %i, got length %i instead', self.dim, np.size(vec))
