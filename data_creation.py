@@ -154,9 +154,13 @@ class np_parameter_structure():
 
 
 class torch_parameter_structure():
-    def __init__(self, gamma, Win=None, Wout=None, bin=None, bout=None):
-        self.gamma = gamma
-        self.dim = torch.size(gamma)
+    def __init__(self, dim, gamma=None, Win=None, Wout=None, bin=None, bout=None):
+
+        self.dim = dim
+        if gamma is None:
+            self.gamma = torch.ones(dim)
+        else:
+            self.gamma = gamma
         if Win is None:
             self.Win = torch.eye(dim)
         else:
