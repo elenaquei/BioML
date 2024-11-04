@@ -240,12 +240,12 @@ class torch_parameter_structure():
         self.gamma = vec_par[0:dim]
         vec_par = vec_par[dim:]
         Win = vec_par[0:dim**2]
-        self.Win = np.reshape(Win, [dim,dim])
+        self.Win = torch.reshape(Win, [dim,dim])
         vec_par = vec_par[dim**2:]
         self.bin = vec_par[0:dim]
         vec_par = vec_par[dim:]
         Wout = vec_par[0:dim**2]
-        self.Wout = np.reshape(Wout, [dim,dim])
+        self.Wout = torch.reshape(Wout, [dim,dim])
         vec_par = vec_par[dim**2:]
         self.bout = vec_par[0:dim]
         return

@@ -28,20 +28,6 @@ def infty_bound(model: nODE):
     return infty_bound
 
 
-def fixed_points(model, *parameters, gridDensity=3):
-    eqBound = model.infty_bound
-    coordinateIntervals = [np.linspace(*bound, num=gridDensity) for bound in eqBound]
-    evalGrid = np.meshgrid(*coordinateIntervals)
-    X = np.column_stack([G_i.flatten() for G_i in evalGrid])
-    end_points = [Newton(0, x, model.F, model.DF, *parameters) for x in X]
-    end_points = np.unique(np.round(end_points, 5), axis=0)
-    return end_points
-
-
-def num_fixed_points(model, *parameters, gridDensity=3):
-    fp = fixed_points(model, *parameters, gridDensity=3)
-    return fp.shape[0]
-
 
 def Newton(t, x_loc, F, DF=None, *parameters):
     def F_newton(x_whatever):
@@ -99,6 +85,25 @@ class Fitting:
         else:
             eqBound = np.array([[0, 100] for i in range(self.dimODE)])
         self.infty_bound = eqBound
+
+
+def fixed_points(model, *parameters, gridDensity=3):
+    if isinstance(model, nODE):
+        model = Fitting(model)
+    if not isinstance(model, Fitting):
+        ValueError("Wrong class, only nODE or Fitting are accepted")
+    eqBound = model.infty_bound
+    coordinateIntervals = [np.linspace(*bound, num=gridDensity) for bound in eqBound]
+    evalGrid = np.meshgrid(*coordinateIntervals)
+    X = np.column_stack([G_i.flatten() for G_i in evalGrid])
+    end_points = [Newton(0, x, model.F, model.DF, *parameters) for x in X]
+    end_points = np.unique(np.round(end_points, 5), axis=0)
+    return end_points
+
+
+def num_fixed_points(model, *parameters, gridDensity=3):
+    fp = fixed_points(model, *parameters, gridDensity=3)
+    return fp.shape[0]
 
 
 def fixed_point_ranking(true_model, found_model):
