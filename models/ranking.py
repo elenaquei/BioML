@@ -101,8 +101,8 @@ def fixed_points(model, *parameters, gridDensity=3):
     return end_points
 
 
-def num_fixed_points(model, *parameters, gridDensity=3):
-    fp = fixed_points(model, *parameters, gridDensity=3)
+def num_fixed_points(model, *parameters, gridDensity=4):
+    fp = fixed_points(model, *parameters, gridDensity=gridDensity)
     return fp.shape[0]
 
 
@@ -110,15 +110,15 @@ def fixed_point_ranking(true_model, found_model):
     true_num_fp = num_fixed_points(true_model)
     found_num_fp = num_fixed_points(found_model)
     grade = 1 - np.abs(true_num_fp - found_num_fp) / true_num_fp
-    return grade
+    return np.max([0, grade])
 
 
 def network_ranking(true_nODE: nODE, found_nODE: nODE):
     true_network = true_nODE.adjacency_matrix()
     found_network = found_nODE.adjacency_matrix()
 
-    ranking_network = 1 - np.linalg.norm(true_network - found_network) / np.linalg.norm(true_network)
-    return ranking_network
+    ranking_network = 1 - np.linalg.norm(true_network - found_network) / np.max([1., np.linalg.norm(true_network)])
+    return np.max([0, ranking_network])
 
 
 def numpify(a):
@@ -138,6 +138,7 @@ def parameter_ranking(true_nODE: nODE, found_nODE: nODE):
     scaling = norm(selected_pars_T) / norm(selected_pars_F)
     ranking = max(1 - norm(+scaling * selected_pars_F - selected_pars_T) / norm(selected_pars_T),
                   1 - norm(-scaling * selected_pars_F - selected_pars_T) / norm(selected_pars_T))
+    ranking = max(0, ranking)
     return ranking, scaling
 
 
