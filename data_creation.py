@@ -292,9 +292,9 @@ def create_dataset(dim, n_data, n_networks=1):
         data_u0, data_uT = from_network_to_data(par_struct, n_data, dim)
         noisy_data_u0, noisy_data_uT = noisy_data(data_u0, data_uT)
         noisy_adjacency = randomize_adjacency(adjacency)
-        x_noisy += [x_squish_data(noisy_data_u0[i, :], noisy_data_uT[i, :], noisy_adjacency) for i in range(n_data)]
-        x_exact += [x_squish_data(data_u0[i, :], data_uT[i, :], adjacency) for i in range(n_data)]
-        y += [y_squish_data(data_uT[i, :], adjacency) for i in range(n_data)]
+        x_noisy.append(x_squish_data(noisy_data_u0[:, :].flatten(), noisy_data_uT[:, :].flatten(), noisy_adjacency))
+        x_exact.append(x_squish_data(data_u0[:, :].flatten(), data_uT[:, :].flatten(), adjacency))
+        y.append(y_squish_data(data_uT[:, :].flatten(), adjacency))
         p.append(par_struct)
     return x_exact, x_noisy, y, p
 
