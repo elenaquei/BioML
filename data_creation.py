@@ -292,9 +292,11 @@ def create_dataset(dim, n_data, n_networks=1):
         data_u0, data_uT = from_network_to_data(par_struct, n_data, dim)
         noisy_data_u0, noisy_data_uT = noisy_data(data_u0, data_uT)
         noisy_adjacency = randomize_adjacency(adjacency)
-        x_noisy.append(x_squish_data(noisy_data_u0[:, :].flatten(), noisy_data_uT[:, :].flatten(), noisy_adjacency))
-        x_exact.append(x_squish_data(data_u0[:, :].flatten(), data_uT[:, :].flatten(), adjacency))
-        y.append(y_squish_data(data_uT[:, :].flatten(), adjacency))
+        x_noisy.append(x_squish_data(noisy_data_u0[:, :].flatten().detach(), noisy_data_uT[:, :].flatten().detach(), noisy_adjacency.detach()))
+        W = torch.matmul(torch.tensor(par_struct.Wout),torch.tensor(par_struct.Win)).flatten().detach()
+        x_exact.append(x_squish_data(data_u0[:, :].flatten().detach(), data_uT[:, :].flatten().detach(), W))
+        #y.append(y_squish_data(data_uT[:, :].flatten(), torch.matmul(torch.tensor(par_struct.Wout),torch.tensor(par_struct.Win)).flatten()))
+        y.append(torch.matmul(torch.tensor(par_struct.Wout),torch.tensor(par_struct.Win)).flatten().detach())
         p.append(par_struct)
     return x_exact, x_noisy, y, p
 
