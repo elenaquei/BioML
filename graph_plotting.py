@@ -1,7 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-from data_creation import create_random_network
+if __name__ == "__main__":
+    from data_creation import create_random_network
 from models.training import easyTrainer, weights_to_dataset
 from models.nODE import nODE, make_nODE_from_parameters
 import scipy

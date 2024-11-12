@@ -1,8 +1,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from models.training import easyTrainer, weights_to_dataset
+
+if __name__ == "__main__":
+    from graph_plotting import plot_graph
 from models.nODE import nODE, make_nODE_from_parameters, become_torch
-import scipy
 import torch
 
 rng1 = np.random.default_rng()
@@ -396,10 +397,15 @@ if __name__ == "__main__":
     # print(data)
 
     test_dim = 4
-    n_data = 4000
+    n_data = 100
     perc_nonzero_el = connectivity_test(test_dim, n_data)
     print('Distribution of types of newtorks:', perc_nonzero_el)
     print('Newtorks with no connections : ', perc_nonzero_el[0])
     # for i in range(1, test_dim ** 2 + 1):
     #     print('Newtorks with ', i, ' connections : ', perc_nonzero_el[i])
-    # create_random_network(test_dim)
+
+    pars, adj = create_random_network(10)
+    plot_graph(adj, linewidth=1.)
+    plt.show()
+
+
