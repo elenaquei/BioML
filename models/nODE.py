@@ -23,6 +23,11 @@ import scipy
 #             dimension.
 
 
+def become_torch(input):
+    if isinstance(input, (np.ndarray, np.generic)):
+        input = torch.from_numpy(input).float()
+    return input
+
 MAX_NUM_STEPS = 1000
 
 
@@ -103,11 +108,6 @@ class nODE(nn.Module):
         return
 
     def set_weights(self, Gamma, Wout=None, bout=None, Win=None, bin=None):
-        def become_torch(input):
-            if isinstance(input, (np.ndarray, np.generic)):
-                input = torch.from_numpy(input).float()
-            return input
-
         self.gamma_layer = torch.nn.Parameter(become_torch(Gamma), requires_grad=True)
         if Win is not None:
             self.inside_weights.weight = torch.nn.Parameter(become_torch(Win), requires_grad=True)

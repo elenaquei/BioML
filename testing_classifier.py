@@ -9,7 +9,8 @@ from torchdiffeq import odeint
 from data_creation import create_dataset, torch_parameter_structure
 from models.ranking import fixed_point_ranking, parameter_ranking, network_ranking
 
-x_train, x_noise, y_train, param = create_dataset(2,1,100)
+
+# x_train, x_noise, y_train, param = create_dataset(2,1,100)
 
 
 class param_classifier(torch.nn.Module):
@@ -119,6 +120,8 @@ def stat_tests(classifier, data_size=300):
     percentage_accurate_dynamics, percentage_ac_networks, percentage_acc_par = n_accurate_dynamics / data_size, n_ac_networks / data_size, n_acc_par / data_size
     return percentage_accurate_dynamics, percentage_ac_networks, percentage_acc_par
 
+
+x, xtilde, y, p = create_dataset(2, 2, 4)
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
