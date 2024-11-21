@@ -47,7 +47,8 @@ class EdgeNet(torch.nn.Module):
         edge_attr = mlp(edge_features)
         
         return edge_attr
-    
+
+# idea: separate out (x(0),x(T)) pairs for finding additional information to put into edge_mlp      
 class NodeNet(torch.nn.Module):
     def __init__(self,in_channels,hidden_channels,out_channels,edge_attr_dim):
         super(NodeNet, self).__init__()
@@ -96,7 +97,8 @@ class NodeNet(torch.nn.Module):
             edge_attr[edge_mask] = self.edge_mlp(attr)
         
         return edge_attr
-    
+
+# idea: update edge weights by propagating through a neural ODE, rather than updating once   
 class EdgeNODE(torch.nn.Module):
     def __init__(self,in_channels,hidden_channels,out_channels,edge_attr_dim):
         super(EdgeNODE, self).__init__()
