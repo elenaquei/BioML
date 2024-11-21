@@ -1,5 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from torch_geometric.data import Data
+from torch_geometric.utils import dense_to_sparse
 
 if __name__ == "__main__":
     from graph_plotting import plot_graph
@@ -363,6 +365,36 @@ def connectivity_test(test_dim, n_data):
     plt.ylabel('Frequency')
     plt.show()
     return perc_nonzero_el
+
+def to_pyg_data(x_train, y_train, ode_dim, n_data):
+    # distribute x_train values as node features
+    x = torch.zeros([ode_dim, 2*n_data])
+
+    k = 0
+    for j in range(0,2*n_data):
+        for i in range(0,ode_dim):
+            x[i,j] = x_train[k]
+            k += 1
+
+    # build edge indices (assuming fully connected network)
+    adj_matrix = torch.ones((ode_dim, ode_dim))
+    edge_index, _ = dense_to_sparse(adj_matrix)
+
+    # distribute weights as edge attributes 
+    edge_attr = torch.zeros([len(edge_index.t()),1])
+    weights  = torch.reshape(x_train[k:],[ode_dim,ode_dim])
+
+    k = 0
+    for i in range(0,ode_dim):
+        for j in range(0,ode_dim):
+                edge_attr[k,0] = weights[i,j]
+                k += 1
+
+    y = y_train
+
+    data = Data(x=x,edge_index=edge_index,edge_attr=edge_attr,y=y)
+
+    return data
 
 
 if __name__ == "__main__":
