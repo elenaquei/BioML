@@ -60,7 +60,7 @@ class EdgeNet(torch.nn.Module):
 
         # Update edge attributes using an MLP
         edge_attr = mlp(edge_features)
-        
+
         return edge_attr
     
 class EdgeODENet(torch.nn.Module):
@@ -82,30 +82,30 @@ class EdgeODENet(torch.nn.Module):
         
         # an MLP is used to transform the initial guess for the edge features to better edge features
         self.edge_mlp = Sequential(
-            Linear(2 * self.gat_out + 1, self.edge_hidden),
+            Linear(2 * self.gat_out + edge_attr_dim, edge_hidden),
             LeakyReLU(),
-            Linear(self.edge_hidden, self.edge_hidden),
+            Linear(edge_hidden, edge_hidden),
             LeakyReLU(),
-            Linear(self.edge_hidden, self.edge_hidden),
-            LeakyReLU(),
-            Linear(self.edge_hidden, edge_attr_dim)
+            Linear(edge_hidden, 2*edge_attr_dim)
         )
 
         # another MLP is used to transform the node features to node-wise parameters
         self.bias_mlp = Sequential(
-            Linear(self.gat_out, self.bias_hidden),
+            Linear(self.gat_out * self.ode_dim, self.bias_hidden),
             LeakyReLU(),
             Linear(self.bias_hidden, self.bias_hidden),
             LeakyReLU(),
             Linear(self.bias_hidden, self.bias_hidden),
             LeakyReLU(),
-            Linear(self.bias_hidden, 3*ode_dim)
+            Linear(self.bias_hidden, 3*self.ode_dim)
         )
 
     def forward(self,data):
         x, edge_index, edge_attr, batch = data.x, data.edge_index, data.edge_attr, data.batch
 
-        x_init = x[0]
+        batch_size = batch.max().item() + 1
+
+        x_init = x[:, :self.n_data].t()
 
         x = self.gat(x,edge_index = edge_index)
 
@@ -113,20 +113,22 @@ class EdgeODENet(torch.nn.Module):
 
         x = self.gat3(x,edge_index = edge_index)
 
-        bias = self.bias_mlp(x)
+        x_per_graph = x.view(batch_size, -1)
+
+        bias = self.bias_mlp(x_per_graph).flatten()
 
         adjacencies = self.update_attributes(x,edge_index,edge_attr)
 
-        Win,Wout,bin,bout,gamma = self.get_params(bias,adjacencies)
+        Win,Wout,bin,bout,gamma = self.get_params(bias,adjacencies,batch_size)
 
         dt = 0.01
         x_hat = odeint(lambda t, x : self.grn_ode(t, x, Win, Wout, bin, bout, gamma), x_init, self.integration_interval, method='euler', options={'step_size': dt})[-1]
         
-        return torch.cat(adjacencies,x_hat)
+        return torch.cat((adjacencies,x_hat.flatten()))
     
-    def get_params(self, bias, adjacencies):
+    def get_params(self, bias, adjacencies, batch_size):
 
-        num_adj = adjacencies.size(0) // 2*(self.ode_dim * self.ode_dim)
+        num_adj = adjacencies.size(0) // (2*(self.ode_dim * self.ode_dim))
 
         w_1, w_2 = adjacencies[:adjacencies.size(0) // 2], adjacencies[adjacencies.size(0) // 2:]
 
@@ -136,9 +138,9 @@ class EdgeODENet(torch.nn.Module):
         Win = torch.block_diag(*Win)
         Wout = torch.block_diag(*Wout)
 
-        bin = bias[:self.ode_dim]
-        bout = bias[self.ode_dim:2*self.ode_dim]
-        gamma = bias[2*self.ode_dim:]
+        bin = bias[:self.ode_dim*batch_size]
+        bout = bias[self.ode_dim*batch_size:2*self.ode_dim*batch_size]
+        gamma = bias[2*self.ode_dim*batch_size:]
 
         return Win,Wout,bin,bout,gamma
         
@@ -147,24 +149,18 @@ class EdgeODENet(torch.nn.Module):
         row, col = edge_index
         src, tgt = x[row], x[col]
 
-        print(src.shape)
-        print(tgt.shape)
-        print(edge_attr.shape)
-
         edge_features = torch.cat([src, tgt, edge_attr], dim=-1)
-
-        print(edge_features.shape)
 
         edge_attr = self.edge_mlp(edge_features)
 
-        print(edge_attr.shape)
+        edge_attr = torch.cat((edge_attr[:, 0], edge_attr[:, 1]))
         
         return edge_attr
 
     def grn_ode(self, t, x, Win,Wout,bin,bout,gamma):
         out = x.matmul(Win.t()) + bin.t()
         out = out.matmul(Wout.t()) + bout.t()
-        out = x.matmul(gamma) + out
+        out = x*gamma + out
         return out
     
 # idea: train both W1, W2 and multiply out at the end
