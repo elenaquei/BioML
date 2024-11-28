@@ -1,8 +1,10 @@
 import torch
 from torch_geometric.nn.conv import GATConv
+from torch_geometric.nn import aggr
 from torch.nn import Linear, Sequential, ReLU, LeakyReLU
 from data_creation import torch_parameter_structure
 from torchdiffeq import odeint
+import torch.nn.functional as F
 import math
 
 class EdgeNet(torch.nn.Module):
@@ -61,6 +63,82 @@ class EdgeNet(torch.nn.Module):
         # Update edge attributes using an MLP
         edge_attr = mlp(edge_features)
 
+        return edge_attr
+    
+# idea: just output parameters (no ODE integration)
+class paramNet(torch.nn.Module):
+    def __init__(self,n_data,ode_dim,edge_attr_dim,gat_out=10,edge_hidden=100, bias_hidden = 100):
+        super(paramNet, self).__init__()
+        
+        self.n_data = n_data
+        self.ode_dim = ode_dim
+        self.edge_attr_dim = edge_attr_dim
+        self.gat_out = gat_out
+        self.edge_hidden = edge_hidden
+        self.bias_hidden = bias_hidden
+
+        # a graph attention network transforms the node features using an attention mechanism in order to take into account global features
+        self.gat = GATConv(2*n_data, self.gat_out)
+        self.gat2 = GATConv(self.gat_out,self.gat_out)
+        self.gat3 = GATConv(self.gat_out,self.gat_out)
+        
+        # an MLP is used to transform the initial guess for the edge features to better edge features
+        self.edge_mlp = Sequential(
+            Linear(2 * self.gat_out + edge_attr_dim, edge_hidden),
+            LeakyReLU(),
+            Linear(edge_hidden, edge_hidden),
+            LeakyReLU(),
+            Linear(edge_hidden, edge_hidden),
+            LeakyReLU(),
+            Linear(edge_hidden, edge_hidden),
+            LeakyReLU(),
+            Linear(edge_hidden, 2*edge_attr_dim)
+        )
+
+        # another MLP is used to transform the node features to node-wise parameters
+        self.bias_mlp = Sequential(
+            Linear(self.gat_out * self.ode_dim, self.bias_hidden),
+            LeakyReLU(),
+            Linear(self.bias_hidden, self.bias_hidden),
+            LeakyReLU(),
+            Linear(self.bias_hidden, self.bias_hidden),
+            LeakyReLU(),
+            Linear(self.bias_hidden, self.bias_hidden),
+            LeakyReLU(),
+            Linear(self.bias_hidden, self.bias_hidden),
+            LeakyReLU(),
+            Linear(self.bias_hidden, 3*self.ode_dim)
+        )
+
+    def forward(self,data):
+        x, edge_index, edge_attr, batch = data.x, data.edge_index, data.edge_attr, data.batch
+
+        batch_size = batch.max().item() + 1
+
+        x = self.gat(x,edge_index = edge_index)
+        x = self.gat2(x,edge_index = edge_index)
+        x = self.gat3(x,edge_index = edge_index)
+
+        adjacencies = self.update_attributes(x,edge_index,edge_attr)
+
+        x_per_graph = x.view(batch_size, -1)
+
+        bias = self.bias_mlp(x_per_graph).flatten()
+
+        
+
+        return torch.cat((adjacencies,bias))      
+
+    def update_attributes(self, x, edge_index, edge_attr):
+        row, col = edge_index
+        src, tgt = x[row], x[col]
+
+        edge_features = torch.cat([src, tgt, edge_attr], dim=-1)
+
+        edge_attr = self.edge_mlp(edge_features)
+
+        edge_attr = torch.cat((edge_attr[:, 0], edge_attr[:, 1]))
+        
         return edge_attr
     
 class EdgeODENet(torch.nn.Module):
