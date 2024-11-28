@@ -66,19 +66,19 @@ class np_parameter_structure():
         self.gamma = gamma
         self.dim = np.size(gamma)
         if Win is None:
-            self.Win = np.eye(dim)
+            self.Win = np.eye(self.dim)
         else:
             self.Win = Win
         if bin is None:
-            self.bin = np.zeros(dim)
+            self.bin = np.zeros(self.dim)
         else:
             self.bin = bin
         if Wout is None:
-            self.Wout = np.eye(dim)
+            self.Wout = np.eye(self.dim)
         else:
             self.Wout = Wout
         if bout is None:
-            self.bout = np.zeros(dim)
+            self.bout = np.zeros(self.dim)
         else:
             self.bout = bout
         self.check_dim()
@@ -111,19 +111,19 @@ class np_parameter_structure():
             self.gamma = gamma
             self.dim = np.size(gamma)
         if Win is None:
-            self.Win = np.eye(dim)
+            self.Win = np.eye(self.dim)
         else:
             self.Win = Win
         if bin is None:
-            self.bin = np.zeros(dim)
+            self.bin = np.zeros(self.dim)
         else:
             self.bin = bin
         if Wout is None:
-            self.Wout = np.eye(dim)
+            self.Wout = np.eye(self.dim)
         else:
             self.Wout = Wout
         if bout is None:
-            self.bout = np.zeros(dim)
+            self.bout = np.zeros(self.dim)
         else:
             self.bout = bout
         return
@@ -216,19 +216,19 @@ class torch_parameter_structure():
             self.gamma = gamma
             self.dim = torch.size(gamma)
         if Win is None:
-            self.Win = torch.eye(dim)
+            self.Win = torch.eye(self.dim)
         else:
             self.Win = Win
         if bin is None:
-            self.bin = torch.zeros(dim)
+            self.bin = torch.zeros(self.dim)
         else:
             self.bin = bin
         if Wout is None:
-            self.Wout = torch.eye(dim)
+            self.Wout = torch.eye(self.dim)
         else:
             self.Wout = Wout
         if bout is None:
-            self.bout = torch.zeros(dim)
+            self.bout = torch.zeros(self.dim)
         else:
             self.bout = bout
         return
@@ -237,9 +237,9 @@ class torch_parameter_structure():
         return self.gamma, self.Win, self.bin, self.Wout, self.bout
 
     def get_vec_par(self):
-        vec_par = np.array([self.gamma.flatten(), self.Win.flatten(), self.bin.flatten(), self.Wout.flatten(),
-                            self.bout.flatten()])
-        return vec_par
+        return torch.cat((self.gamma.flatten(), self.Win.flatten(), self.bin.flatten(), self.Wout.flatten(),
+                            self.bout.flatten())).numpy()
+
 
     def set_vec_par(self, vec_par):
         dim_vec = (vec_par.flatten().size())[0]
@@ -283,18 +283,31 @@ def create_random_network(dim):
                 index = np.random.choice(range(dim))
                 adjacency[i, index] = np.random.gamma(3, 0.5)
         return adjacency
+    def random_negative(mat):
+        random_mat = np.random.uniform(size=(dim, dim))
+        mat[random_mat > 0.5] = - mat[random_mat > 0.5]
+        return mat
+    def random_permutation(dim):
+        rand_mat = np.diag(np.random.gamma(3, 0.5, size=dim))[np.random.choice(np.array(range(dim)), size=dim, replace=False)]
+        return rand_mat
+    def random_sparse(dim, mat = None):
+        iters = int(np.floor(dim**1.5))
+        if mat is None:
+            mat = np.zeros((dim, dim))
+        for _ in range(iters):
+            i,j = np.random.choice(np.array(range(dim))),np.random.choice(np.array(range(dim)))
+            if mat[i,j] == 0:
+                mat[i,j] = np.random.gamma(3, 0.5)
+        return mat
 
     gamma = - np.abs(np.random.gamma(3, 0.5, size=[dim]))
     bin, bout = np.random.gamma(3, 0.5, size=[dim]), np.random.gamma(3, 0.5, size=[dim])
 
     adjacency = np.random.gamma(3, 0.5, size=[dim, dim])
-    Wout = np.random.gamma(3, 0.5, size=[dim, dim])
-    Wout = random_zeros(Wout, threshold=0.45)
-    # remove the diagonal
-    Wout = np.multiply(Wout, (1 - np.diag(np.ones(dim))))
-    # add random non-zero diagonal to enforce non-singularity
-    Wout = np.diag(np.random.gamma(3, 0.5, size=[dim])) + Wout
     adjacency = hub_struct(adjacency)
+    adjacency = random_negative(adjacency)
+
+    Wout = random_sparse(dim, random_permutation(dim))
 
     try:
         Win = np.linalg.solve(Wout, adjacency)
@@ -302,8 +315,19 @@ def create_random_network(dim):
         Win = np.eye([dim])
         print(99)
 
+    for i in range(dim):
+        for j in range(dim):
+            while np.abs(Win[i,j])>10:
+                Win[i,j] = np.random.gamma(3, 0.5)
+            if np.abs(Win[i,j]) * np.random.uniform() < 0.5:
+                if np.sum(np.abs(Win[i,:]) - np.abs(Win[i,j])) > 0.01 and np.sum(np.abs(Win[j, :]) - np.abs(Win[i,j])) > 0.01 :
+                    # not the last element in line or row
+                    Win[i,j] = 0
+
+    adjacency_updated = np.matmul(Wout, Win)
+
     par_struct = create_torch_par(gamma, Win, bin, Wout, bout)
-    return par_struct, become_torch(adjacency)
+    return par_struct, become_torch(adjacency_updated)
 
 
 def from_network_to_data(par_struct, n_data, dim):
@@ -398,6 +422,7 @@ def to_pyg_data(x_train, y_train, ode_dim, n_data):
 
 
 if __name__ == "__main__":
+    """
     dim = 2
     n_data = 50
 
@@ -435,9 +460,11 @@ if __name__ == "__main__":
     print('Newtorks with no connections : ', perc_nonzero_el[0])
     # for i in range(1, test_dim ** 2 + 1):
     #     print('Newtorks with ', i, ' connections : ', perc_nonzero_el[i])
+    """
 
-    pars, adj = create_random_network(10)
-    plot_graph(adj, linewidth=1.)
-    plt.show()
+    for i in range(10):
+        pars, adj = create_random_network(4)
+        plot_graph(adj, linewidth=1.)
+        plt.show()
 
 

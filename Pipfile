@@ -5,7 +5,7 @@ name = "pypi"
 
 [packages]
 jupyter = "*"
-numpy = "*"
+numpy = '1.24.4'
 matplotlib = '3.5.0'
 torch = "*"
 IPython = "*"
