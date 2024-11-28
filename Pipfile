@@ -15,6 +15,7 @@ imageio = "*"
 nbclassic = "*"
 scikit-learn = "*"
 torchdiffeq = "*"
+torch-geometric = "*"
 
 [dev-packages]
 

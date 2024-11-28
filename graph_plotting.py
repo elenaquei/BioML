@@ -84,7 +84,7 @@ def define_nodes(n_nodes, rotation = 0.):
 
 def plot_nodes(xy, node_numbers=None):
     if node_numbers is None:
-        node_numbers = range(xy.shape[0])
+        node_numbers = range(np.shape(xy)[1])
     for i in range(np.shape(xy)[1]):
         plot_node(xy[:, i], number=str(node_numbers[i]))
 
