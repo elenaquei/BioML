@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from torch_geometric.data import Data
 from torch_geometric.utils import dense_to_sparse
+from models.nODE import nODE
 
 if __name__ == "__main__":
     from graph_plotting import plot_graph
@@ -260,6 +261,16 @@ class torch_parameter_structure():
         self.bout = vec_par[0:dim]
         return
 
+    def make_nODE_from_parstruct(self):
+        gamma, Win, bin, Wout, bout = self.get_parameters()
+        node = make_nODE_from_parameters(gamma, Win, bin, Wout, bout)
+        return node
+
+    def phase_portrait_from_parstruct(self):
+        node = self.make_nODE_from_parstruct()
+        node.phase_portrait()
+        plt.show()
+        return
 
 def random_sign():
     return np.random.choice([-1,1])
@@ -308,36 +319,15 @@ def create_random_network(dim):
     gamma = - np.abs(np.random.gamma(3, 0.5, size=[dim]))
     bin, bout = np.random.gamma(3, 0.5, size=[dim]), np.random.gamma(3, 0.5, size=[dim])
 
-    adjacency = np.random.gamma(3, 0.5, size=[dim, dim])
-    adjacency = hub_struct(adjacency)
-    adjacency = random_negative(adjacency)
+    Win = np.random.gamma(3, 0.5, size=[dim, dim])
+    Win = hub_struct(Win)
+    Win = random_negative(Win)
 
-    Wout = random_sparse(dim, random_permutation(dim))
+    Wout = random_negative(np.diag(np.random.gamma(3, 0.5, size=dim)))
 
-    try:
-        Win = np.linalg.solve(Wout, adjacency)
-    except ValueError:
-        Win = np.eye([dim])
-        print(99)
-
-    scrambled_index_i = np.random.choice(np.array(range(dim)), size=dim, replace=False)
-    scrambled_index_j = np.random.choice(np.array(range(dim)), size=dim, replace=False)
-    # scrambling the indices avoids that the "last element checked" is at the bottom of the matrix
-    for i in scrambled_index_i:
-        for j in scrambled_index_j:
-            while np.abs(Win[i,j])>10:
-                Win[i,j] = np.random.gamma(3, 0.5)
-            if np.abs(Win[i,j]) * np.random.uniform() < 0.5:
-                if (np.sum(np.abs(Win[i,:])) - np.abs(Win[i,j]) > 0.01 and
-                        np.sum(np.abs(Win[:, j])) - np.abs(Win[i,j]) > 0.01) :
-                    # not the last element in line or row
-                    Win[i,j] = 0
-
-    adjacency_updated = np.matmul(Wout, Win)
-    # if min(np.abs(adjacency_updated[np.abs(adjacency_updated) > 0].flatten())) < 0.01:
-    print(min(np.abs(adjacency_updated[np.abs(adjacency_updated) > 0].flatten())), '\n', Wout, '\n', adjacency)
+    adjacency = np.sign(np.matmul(Wout, Win))
     par_struct = create_torch_par(gamma, Win, bin, Wout, bout)
-    return par_struct, become_torch(adjacency_updated)
+    return par_struct, become_torch(adjacency)
 
 
 def from_network_to_data(par_struct, n_data, dim):
@@ -387,18 +377,7 @@ def extract_adjacency(x, n_nodes):
     return adj
 
 
-def connectivity_test(test_dim, n_data):
-    data = create_dataset(test_dim, 1, n_data)
-    all_adj = extract_adjacency(data[0], test_dim)
-    perc_nonzero_el = torch.zeros(test_dim ** 2 + 1)
-    for adj in all_adj:
-        perc_nonzero_el[torch.sum(adj != 0)] += 1
-    perc_nonzero_el /= n_data
-    plt.stairs(perc_nonzero_el)
-    plt.xlabel('Number of non-zero elements in the adjacency matrix')
-    plt.ylabel('Frequency')
-    plt.show()
-    return perc_nonzero_el
+
 
 def to_pyg_data(x_train, y_train, ode_dim, n_data):
     # distribute x_train values as node features
@@ -474,18 +453,10 @@ if __name__ == "__main__":
     dim = 3
     n_data = 4
     # create_dataset(dim, n_data, n_networks=5)
-    count = 0
-    n_tests = 1000
+    n_tests = 20
     for i in range(n_tests):
         pars, adj = create_random_network(4)
-        adjacency_updated = adj
-        if min(np.abs(adjacency_updated[np.abs(adjacency_updated) > 0].flatten())) < 0.01:
-            count += 1
-            # print('smallest edge', min(np.abs(adjacency_updated[np.abs(adjacency_updated) > 0].flatten())))
-        if count > 3:
-            break
-        # plot_graph(adj, linewidth=1.)
-        # plt.show()
-    print('percentage of small edges :', count/n_tests)
+        plot_graph(adj, linewidth=1.)
+        plt.show()
 
 
