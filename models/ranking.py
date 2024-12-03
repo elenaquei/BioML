@@ -69,7 +69,7 @@ class Fitting:
 
         def F_node(t, x):
             x_torch = torch.from_numpy(x).float()
-            y = node.right_hand_side(t, x_torch).detach().numpy()[0]
+            y = node.right_hand_side(t, x_torch).detach().numpy()
             return y
 
         def DF_node(t, x):
@@ -97,7 +97,7 @@ def fixed_points(model, *parameters, gridDensity=3):
     evalGrid = np.meshgrid(*coordinateIntervals)
     X = np.column_stack([G_i.flatten() for G_i in evalGrid])
     end_points = [Newton(0, x, model.F, model.DF, *parameters) for x in X]
-    end_points = np.unique(np.round(end_points, 5), axis=0)
+    end_points = np.unique(np.round(end_points, 4), axis=0)
     return end_points
 
 
