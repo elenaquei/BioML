@@ -261,6 +261,10 @@ class torch_parameter_structure():
         return
 
 
+def random_sign():
+    return np.random.choice([-1,1])
+
+
 def create_random_network(dim):
     def hub_struct(adjacency):
         def draw_connection():
@@ -282,11 +286,13 @@ def create_random_network(dim):
             if all(adjacency[i, :] == 0):
                 index = np.random.choice(range(dim))
                 adjacency[i, index] = np.random.gamma(3, 0.5)
+            if all(adjacency[:, i] == 0):
+                index = np.random.choice(range(dim))
+                adjacency[index, i] = np.random.gamma(3, 0.5)
         return adjacency
     def random_negative(mat):
-        random_mat = np.random.uniform(size=(dim, dim))
-        mat[random_mat > 0.5] = - mat[random_mat > 0.5]
-        return mat
+        random_sign = np.random.choice([-1,1], size=(dim, dim))
+        return random_sign * mat
     def random_permutation(dim):
         rand_mat = np.diag(np.random.gamma(3, 0.5, size=dim))[np.random.choice(np.array(range(dim)), size=dim, replace=False)]
         return rand_mat
@@ -296,8 +302,7 @@ def create_random_network(dim):
             mat = np.zeros((dim, dim))
         for _ in range(iters):
             i,j = np.random.choice(np.array(range(dim))),np.random.choice(np.array(range(dim)))
-            if mat[i,j] == 0:
-                mat[i,j] = np.random.gamma(3, 0.5)
+            mat[i,j] += random_sign() * np.random.gamma(3, 0.5)
         return mat
 
     gamma = - np.abs(np.random.gamma(3, 0.5, size=[dim]))
@@ -315,17 +320,22 @@ def create_random_network(dim):
         Win = np.eye([dim])
         print(99)
 
-    for i in range(dim):
-        for j in range(dim):
+    scrambled_index_i = np.random.choice(np.array(range(dim)), size=dim, replace=False)
+    scrambled_index_j = np.random.choice(np.array(range(dim)), size=dim, replace=False)
+    # scrambling the indices avoids that the "last element checked" is at the bottom of the matrix
+    for i in scrambled_index_i:
+        for j in scrambled_index_j:
             while np.abs(Win[i,j])>10:
                 Win[i,j] = np.random.gamma(3, 0.5)
             if np.abs(Win[i,j]) * np.random.uniform() < 0.5:
-                if np.sum(np.abs(Win[i,:]) - np.abs(Win[i,j])) > 0.01 and np.sum(np.abs(Win[j, :]) - np.abs(Win[i,j])) > 0.01 :
+                if (np.sum(np.abs(Win[i,:])) - np.abs(Win[i,j]) > 0.01 and
+                        np.sum(np.abs(Win[:, j])) - np.abs(Win[i,j]) > 0.01) :
                     # not the last element in line or row
                     Win[i,j] = 0
 
     adjacency_updated = np.matmul(Wout, Win)
-
+    # if min(np.abs(adjacency_updated[np.abs(adjacency_updated) > 0].flatten())) < 0.01:
+    print(min(np.abs(adjacency_updated[np.abs(adjacency_updated) > 0].flatten())), '\n', Wout, '\n', adjacency)
     par_struct = create_torch_par(gamma, Win, bin, Wout, bout)
     return par_struct, become_torch(adjacency_updated)
 
@@ -461,10 +471,21 @@ if __name__ == "__main__":
     # for i in range(1, test_dim ** 2 + 1):
     #     print('Newtorks with ', i, ' connections : ', perc_nonzero_el[i])
     """
-
-    for i in range(10):
+    dim = 3
+    n_data = 4
+    # create_dataset(dim, n_data, n_networks=5)
+    count = 0
+    n_tests = 1000
+    for i in range(n_tests):
         pars, adj = create_random_network(4)
-        plot_graph(adj, linewidth=1.)
-        plt.show()
+        adjacency_updated = adj
+        if min(np.abs(adjacency_updated[np.abs(adjacency_updated) > 0].flatten())) < 0.01:
+            count += 1
+            # print('smallest edge', min(np.abs(adjacency_updated[np.abs(adjacency_updated) > 0].flatten())))
+        if count > 3:
+            break
+        # plot_graph(adj, linewidth=1.)
+        # plt.show()
+    print('percentage of small edges :', count/n_tests)
 
 
