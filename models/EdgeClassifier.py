@@ -12,15 +12,31 @@ class EdgeClassNet(torch.nn.Module):
         super(EdgeClassNet, self).__init__()
 
         self.conv_out = int(in_channels)
-        self.conv_out2 = int(in_channels)
-        self.conv_out3 = 4
+        # self.conv_out2 = int(in_channels)
+        #self.conv_out3 = 4
         
-        self.gat_conv = GATConv(2*in_channels,self.conv_out)
-        self.gat_conv2 = GATConv(self.conv_out,self.conv_out2)
-        self.gat_conv3 = GATConv(self.conv_out2,self.conv_out3)
+        self.gat_conv = GATConv(in_channels,in_channels)
+        # self.gat_conv2 = GATConv(self.conv_out,self.conv_out2)
+        # self.gat_conv3 = GATConv(self.conv_out2,self.conv_out3)
+
+        self.x_mlp = Linear(2*in_channels, in_channels)
+        self.act = LeakyReLU()
+
 
         self.edge_mlp = Sequential(
-            Linear(4 * in_channels + edge_attr_dim, hidden_channels),
+            Linear(2* self.conv_out + edge_attr_dim, hidden_channels),
+            LeakyReLU(),
+            Linear(hidden_channels, hidden_channels),
+            LeakyReLU(),
+            Linear(hidden_channels, hidden_channels),
+            LeakyReLU(),
+            Linear(hidden_channels, hidden_channels),
+            LeakyReLU(),
+            Linear(hidden_channels, hidden_channels),
+            LeakyReLU(),
+            Linear(hidden_channels, hidden_channels),
+            LeakyReLU(),
+            Linear(hidden_channels, hidden_channels),
             LeakyReLU(),
             Linear(hidden_channels, hidden_channels),
             LeakyReLU(),
@@ -32,9 +48,13 @@ class EdgeClassNet(torch.nn.Module):
     def forward(self, data):
         x, edge_index, edge_attr, batch = data.x, data.edge_index, data.edge_attr, data.batch
 
-        #x = self.gat_conv(x,edge_index = edge_index)
-        #x = self.gat_conv2(x,edge_index = edge_index)
-        #x = self.gat_conv3(x,edge_index = edge_index)
+        # x = self.gat_conv(x,edge_index = edge_index)
+        # x = self.gat_conv2(x,edge_index = edge_index)
+        # x = self.gat_conv3(x,edge_index = edge_index)
+        x = self.x_mlp(x)
+        x = self.act(x)
+
+        x = self.gat_conv(x)
 
         edge_attr = self.update_attributes(x,edge_index,edge_attr, self.edge_mlp)
 
