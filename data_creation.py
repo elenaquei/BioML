@@ -478,6 +478,32 @@ if __name__ == "__main__":
                     plt.subplot(1, dim, j+1)
                     plt.plot([0,1], [x0[j], xT[j]])
         plt.show()
+
+
+    dim = 3
+    n_data = 300
+    for m in range(5):
+        x_exact, x_noisy, y, p = create_dataset(dim, n_data, n_networks=1)
+        def split_Data(x_exact_i):
+            x0 = np.zeros([n_data, dim])
+            xT = np.zeros([n_data, dim])
+            for j in range(n_data):
+                x0[j,:] = x_exact_i[:dim]
+                x_exact_i = x_exact_i[dim:]
+            for j in range(n_data):
+                xT[j,:] = x_exact_i[:dim]
+                x_exact_i = x_exact_i[dim:]
+            return x0, xT
+
+
+        if dim == 3:
+            ax = plt.figure().add_subplot(projection='3d')
+        for x_exact_i in x_exact:
+            x0, xT = split_Data(x_exact_i)
+            if dim == 3:
+                for k in range(n_data):
+                    ax.plot([x0[k,0],xT[k,0]],[x0[k,1],xT[k,1]], [x0[k,2],xT[k,2]])
+        plt.show()
     n_tests = 20
     for i in range(n_tests):
         pars, adj = create_random_network(4)
