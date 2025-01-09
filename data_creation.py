@@ -338,7 +338,7 @@ def from_network_to_data(par_struct, n_data, dim):
     for i in range(dim):
         u0[:, i] = u0[:, i]*(bout[i] + 2)/ np.abs(gamma[i]) # rescaling of initial condition
     node_2D.time_interval = [0, 0.1]
-    print("REMOVE THIS!")
+    # print("REMOVE THIS!")
     uT = node_2D.forward(u0)
     return u0, uT
 
@@ -381,6 +381,50 @@ def extract_adjacency(x, n_nodes):
     return adj
 
 
+def to_pyg_data_guess(x_train, y_train, ode_dim, n_data):
+    # distribute x_train values as node features
+    x = torch.zeros([ode_dim, 2*n_data])
+
+    k = 0
+    for j in range(0,2*n_data):
+        for i in range(0,ode_dim):
+            x[i,j] = x_train[k]
+            k += 1
+
+    # distribute weights as edge attributes
+    weights  = torch.reshape(x_train[k:],[ode_dim,ode_dim])
+    edge_index, _ = dense_to_sparse(weights)
+    edge_attr = torch.zeros([len(edge_index.t()),1])
+
+    for i in range(0,len(edge_index.t())):
+        edge_attr[i,0] = 1.0
+
+    y = y_train
+
+    data = Data(x=x,edge_index=edge_index,edge_attr=edge_attr,y=y)
+
+    return data
+
+
+def to_pyg_data_true(x_train, y_train, ode_dim, n_data):
+    # distribute x_train values as node features
+    x = torch.zeros([ode_dim, 2*n_data])
+
+    k = 0
+    for j in range(0,2*n_data):
+        for i in range(0,ode_dim):
+            x[i,j] = x_train[k]
+            k += 1
+
+    # distribute weights as edge attributes
+    weights  = torch.reshape(y_train,[ode_dim,ode_dim])
+    edge_index, edge_attr = dense_to_sparse(weights)
+
+    y = y_train
+
+    data = Data(x=x,edge_index=edge_index,edge_attr=edge_attr,y=y)
+
+    return data
 
 
 def to_pyg_data(x_train, y_train, ode_dim, n_data):
