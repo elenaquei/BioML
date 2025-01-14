@@ -342,8 +342,20 @@ def from_network_to_data(par_struct, n_data, dim):
     uT = node_2D.forward(u0)
     return u0, uT
 
+def from_network_to_tp_data(par_struct, n_data, dim, time_points):
+    gamma, Win, bin, Wout, bout = par_struct.get_parameters()
+    node_2D = make_nODE_from_parameters(gamma, Win=Win, bin=bin, Wout=Wout, bout=bout)
 
-def create_dataset(dim, n_data, n_networks=1):
+    u0 = torch.rand([n_data, dim])
+    for i in range(dim):
+        u0[:, i] = u0[:, i]*(bout[i] + 2)/ np.abs(gamma[i]) # rescaling of initial condition
+    node_2D.time_interval = [0, time_points[-1]]
+    # print("REMOVE THIS!")
+    uT = node_2D.integrate_timepoints(u0, time_points)
+    return u0, uT
+
+
+def create_dataset(dim, n_data, n_networks=1, time_points=[]):
     def x_squish_data(u0, uT, Atilde):
         x = torch.cat((u0, uT, Atilde.flatten()))
         return x
@@ -358,7 +370,11 @@ def create_dataset(dim, n_data, n_networks=1):
     p = list()  # p_i = torch_parameter_structure
     for j in range(n_networks):
         par_struct, adjacency = create_random_network(dim)
-        data_u0, data_uT = from_network_to_data(par_struct, n_data, dim)
+        if len(time_points) == 0:
+            data_u0, data_uT = from_network_to_data(par_struct, n_data, dim)
+        else:
+            data_u0, data_uT = from_network_to_tp_data(par_struct, n_data, dim, time_points)
+
         noisy_data_u0, noisy_data_uT = noisy_data(data_u0, data_uT)
         noisy_adjacency = randomize_adjacency(adjacency)
         x_noisy.append(x_squish_data(noisy_data_u0[:, :].flatten().detach(), noisy_data_uT[:, :].flatten().detach(),
@@ -408,10 +424,10 @@ def to_pyg_data_guess(x_train, y_train, ode_dim, n_data):
 
 def to_pyg_data_true(x_train, y_train, ode_dim, n_data):
     # distribute x_train values as node features
-    x = torch.zeros([ode_dim, 2*n_data])
+    x = torch.zeros([ode_dim, n_data])
 
     k = 0
-    for j in range(0,2*n_data):
+    for j in range(0,n_data):
         for i in range(0,ode_dim):
             x[i,j] = x_train[k]
             k += 1

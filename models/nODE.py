@@ -241,6 +241,11 @@ class nODE(nn.Module):
         else:
             out = out[1, :]
         return out
+    
+    def integrate_timepoints(self, x, time_points):
+        out = odeint(self.right_hand_side, x, time_points)
+        
+        return out[1:, :, :]
 
     def forward_integration(self, x, integration_time=None):
         if integration_time is None:
