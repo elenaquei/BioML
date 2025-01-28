@@ -342,6 +342,7 @@ def from_network_to_data(par_struct, n_data, dim):
     uT = node_2D.forward(u0)
     return u0, uT
 
+
 def from_network_to_tp_data(par_struct, n_data, dim, time_points):
     gamma, Win, bin, Wout, bout = par_struct.get_parameters()
     node_2D = make_nODE_from_parameters(gamma, Win=Win, bin=bin, Wout=Wout, bout=bout)
@@ -355,7 +356,67 @@ def from_network_to_tp_data(par_struct, n_data, dim, time_points):
     return u0, uT
 
 
-def create_dataset(dim, n_data, n_networks=1, time_points=[]):
+def create_ring_network(dim):
+    sequence = np.random.choice(np.array(range(dim)), size=dim, replace = False)
+    adjacency = np.zeros((dim, dim))
+    for i in range(1, dim):
+        adjacency[sequence[i-1], sequence[i]] = -1
+    adjacency[sequence[-1], sequence[0]] = -1
+    Win = adjacency
+    Wout = np.eye(dim)
+    gamma = - np.ones(dim)
+    bin, bout = 0.5 *  np.ones([dim,1]), 0.5 *  np.ones([dim,1])
+    par_struct = create_torch_par(gamma, Win, bin, Wout, bout)
+    return par_struct, become_torch(adjacency)
+
+
+def create_noisy_ring_network(dim):
+    sequence = np.random.choice(np.array(range(dim)), size=dim, replace = False)
+    adjacency = np.zeros((dim, dim))
+    for i in range(1, dim):
+        adjacency[sequence[i-1], sequence[i]] = -1
+    adjacency[sequence[-1], sequence[0]] = -1
+    for j in range(int(dim/5)):
+        Rindex = np.random.choice(np.array(range(dim)), size=2)
+        adjacency[Rindex[0], Rindex[1]] = -1
+    Win = adjacency
+    Wout = np.eye(dim)
+    gamma = - np.ones(dim)
+    bin, bout = 0.5 *  np.ones([dim,1]), 0.5 *  np.ones([dim,1])
+    par_struct = create_torch_par(gamma, Win, bin, Wout, bout)
+    return par_struct, become_torch(adjacency)
+
+
+def create_star_network(dim):
+    center = np.random.choice(np.array(range(dim)), size=1)
+    adjacency = np.zeros((dim, dim))
+    for i in range(dim):
+        adjacency[i, center] = 1
+    Win = adjacency
+    Wout = np.eye(dim)
+    gamma = - np.ones(dim)
+    bin, bout = 0.5 *  np.ones([dim,1]), 0.5 *  np.ones([dim,1])
+    par_struct = create_torch_par(gamma, Win, bin, Wout, bout)
+    return par_struct, become_torch(adjacency)
+
+
+def create_noisy_star_network(dim):
+    center = np.random.choice(np.array(range(dim)), size=1)
+    adjacency = np.zeros((dim, dim))
+    for i in range(dim):
+        adjacency[i, center] = 1
+    for j in range(int(dim/5)):
+        Rindex = np.random.choice(np.array(range(dim)), size=2)
+        adjacency[Rindex[0], Rindex[1]] = 1
+    Win = adjacency
+    Wout = np.eye(dim)
+    gamma = - np.ones(dim)
+    bin, bout = 0.5 *  np.ones([dim,1]), 0.5 *  np.ones([dim,1])
+    par_struct = create_torch_par(gamma, Win, bin, Wout, bout)
+    return par_struct, become_torch(adjacency)
+
+
+def create_dataset(dim, n_data, n_networks=1, time_points=[], options=None):
     def x_squish_data(u0, uT, Atilde):
         x = torch.cat((u0, uT, Atilde.flatten()))
         return x
@@ -369,7 +430,19 @@ def create_dataset(dim, n_data, n_networks=1, time_points=[]):
     y = list()  # y_i = uTi, A.flatten
     p = list()  # p_i = torch_parameter_structure
     for j in range(n_networks):
-        par_struct, adjacency = create_random_network(dim)
+        if options is None:
+            par_struct, adjacency = create_random_network(dim)
+        elif options == "ring":
+            par_struct, adjacency = create_ring_network(dim)
+        elif options == "star":
+            par_struct, adjacency = create_star_network(dim)
+        elif options == "noisy_ring":
+            par_struct, adjacency = create_noisy_ring_network(dim)
+        elif options == "noisy_star":
+            par_struct, adjacency = create_noisy_star_network(dim)
+        else:
+            raise ValueError('Unknown option %r'%options)
+
         if len(time_points) == 0:
             data_u0, data_uT = from_network_to_data(par_struct, n_data, dim)
         else:
