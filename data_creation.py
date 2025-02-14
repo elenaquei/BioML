@@ -330,7 +330,7 @@ def create_random_network(dim):
     return par_struct, become_torch(adjacency)
 
 
-def from_network_to_data(par_struct, n_data, dim):
+def from_network_to_data(par_struct, n_data, dim, time_interval=0.1):
     gamma, Win, bin, Wout, bout = par_struct.get_parameters()
     node_2D = make_nODE_from_parameters(gamma, Win=Win, bin=bin, Wout=Wout, bout=bout)
 
@@ -587,10 +587,7 @@ if __name__ == "__main__":
     # for i in range(1, test_dim ** 2 + 1):
     #     print('Newtorks with ', i, ' connections : ', perc_nonzero_el[i])
     """
-    dim = 2
-    n_data = 300
-    for m in range(5):
-        x_exact, x_noisy, y, p = create_dataset(dim, n_data, n_networks=1)
+    def plot_dataset(dim, x_exact):
         def split_Data(x_exact_i):
             x0 = np.zeros([n_data, dim])
             xT = np.zeros([n_data, dim])
@@ -601,46 +598,69 @@ if __name__ == "__main__":
                 xT[j,:] = x_exact_i[:dim]
                 x_exact_i = x_exact_i[dim:]
             return x0, xT
+
+        if dim == 3:
+            ax = plt.figure().add_subplot(projection='3d')
         for x_exact_i in x_exact:
             x0, xT = split_Data(x_exact_i)
             if dim ==2 :
                 for k in range(n_data):
                     plt.plot([x0[k,0],xT[k,0]],[x0[k,1],xT[k,1]])
+            elif dim ==3 :
+                for k in range(n_data):
+                    ax.plot([x0[k, 0], xT[k, 0]], [x0[k, 1], xT[k, 1]], [x0[k, 2], xT[k, 2]])
             else:
                 for j in range(dim):
                     plt.subplot(1, dim, j+1)
                     plt.plot([0,1], [x0[j], xT[j]])
         plt.show()
 
+    dim = 2
+    n_data = 300
+    for m in range(0):
+        x_exact, x_noisy, y, p = create_dataset(dim, n_data, n_networks=1)
+        plot_dataset(dim, x_exact)
+
+    dim = 3
+    n_data = 300
+    for m in range(0):
+        x_exact, x_noisy, y, p = create_dataset(dim, n_data, n_networks=1)
+        plot_dataset(dim, x_exact)
+
+    n_tests = 5
+    for i in range(n_tests):
+        pars, adj = create_ring_network(4)
+        plot_graph(adj, linewidth=1.)
+        plt.show()
+
+    n_tests = 5
+    for i in range(n_tests):
+        pars, adj = create_star_network(4)
+        plot_graph(adj, linewidth=1.)
+        plt.show()
+
+
+    n_tests = 5
+    for i in range(n_tests):
+        pars, adj = create_noisy_ring_network(10)
+        plot_graph(adj, linewidth=1.)
+        plt.show()
+
+    n_tests = 5
+    for i in range(n_tests):
+        pars, adj = create_noisy_star_network(10)
+        plot_graph(adj, linewidth=1.)
+        plt.show()
 
     dim = 3
     n_data = 300
     for m in range(5):
-        x_exact, x_noisy, y, p = create_dataset(dim, n_data, n_networks=1)
-        def split_Data(x_exact_i):
-            x0 = np.zeros([n_data, dim])
-            xT = np.zeros([n_data, dim])
-            for j in range(n_data):
-                x0[j,:] = x_exact_i[:dim]
-                x_exact_i = x_exact_i[dim:]
-            for j in range(n_data):
-                xT[j,:] = x_exact_i[:dim]
-                x_exact_i = x_exact_i[dim:]
-            return x0, xT
+        x_exact, x_noisy, y, p = create_dataset(dim, n_data, n_networks=1, options='star') # or options = 'ring'
+        plot_dataset(dim, x_exact)
 
-
-        if dim == 3:
-            ax = plt.figure().add_subplot(projection='3d')
-        for x_exact_i in x_exact:
-            x0, xT = split_Data(x_exact_i)
-            if dim == 3:
-                for k in range(n_data):
-                    ax.plot([x0[k,0],xT[k,0]],[x0[k,1],xT[k,1]], [x0[k,2],xT[k,2]])
-        plt.show()
-    n_tests = 20
-    for i in range(n_tests):
-        pars, adj = create_random_network(4)
-        # plot_graph(adj, linewidth=1.)
-        # plt.show()
-
+    dim = 3
+    n_data = 300
+    for m in range(5):
+        x_exact, x_noisy, y, p = create_dataset(dim, n_data, n_networks=1, options='ring') # or options = 'ring'
+        plot_dataset(dim, x_exact)
 

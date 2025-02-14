@@ -128,18 +128,31 @@ def numpify(a):
 def parameter_ranking(true_nODE: nODE, found_nODE: nODE):
     def norm(vecORmat):
         return np.linalg.norm(vecORmat)
+    def append_local(gamma, W1, b1, W2, b2):
+        return np.append(gamma, np.append(W1.flatten(), np.append(b1, np.append(W2.flatten(), b2))))
 
     gamma_T, W1_T, b1_T, W2_T, b2_T = true_nODE.get_weights()
     gamma_T, W1_T, b1_T, W2_T, b2_T = numpify([gamma_T, W1_T, b1_T, W2_T, b2_T])
     gamma_F, W1_F, b1_F, W2_F, b2_F = found_nODE.get_weights()
     gamma_F, W1_F, b1_F, W2_F, b2_F = numpify([gamma_F, W1_F, b1_F, W2_F, b2_F])
-    selected_pars_T = np.append(np.append(gamma_T, np.array([norm(W1_T), norm(b1_T), norm(W2_T)])), b2_T)
-    selected_pars_F = np.append(np.append(gamma_F, np.array([norm(W1_F), norm(b1_F), norm(W2_F)])), b2_F)
+    selected_pars_T = append_local(gamma_T, norm(W1_T), norm(b1_T), norm(W2_T), b2_T)
+    selected_pars_F = append_local(gamma_F, norm(W1_F), norm(b1_F), norm(W2_F), b2_F)
     scaling = norm(selected_pars_T) / norm(selected_pars_F)
     ranking = max(1 - norm(+scaling * selected_pars_F - selected_pars_T) / norm(selected_pars_T),
                   1 - norm(-scaling * selected_pars_F - selected_pars_T) / norm(selected_pars_T))
     ranking = max(0, ranking)
+
+    # ranking = max([1 - norm(np.array([(scaling * selected_pars_F[i] - selected_pars_T[i]) / max(1, selected_pars_T[i])
+    #                                       for i in range(np.size(selected_pars_T))])) for scaling in [-1, 1]])
     return ranking, scaling
+
+
+def rank(true_model, found_model):
+    """ all parameters are supposed to be fixed in this case"""
+    rank_on_parameters = parameter_ranking(true_model, found_model)[0]
+    rank_on_network = network_ranking(true_model, found_model)
+    rank_on_fixed_points = fixed_point_ranking(true_model, found_model)
+    return [rank_on_network, rank_on_parameters, rank_on_fixed_points]
 
 
 if __name__ == "__main__":
@@ -174,4 +187,21 @@ if __name__ == "__main__":
     print('network raking : ', ranking_network)
 
     pr, scaling = parameter_ranking(TS_bistable, node2)
+    print("parameter ranking : ", pr, ' with rescaling : ', scaling)
+
+    full_rank = rank(TS_bistable, node2)
+    print('full ranking : ', full_rank)
+
+    ODE_dim = 2
+    Gamma = np.array([-1., -1.])
+    integration_time = 1
+    Win = 6*np.array([[0, -1], [1, 0]]).astype(float)
+    Wout = 6*np.array([[2, 0], [0, -2]]).astype(float)
+    bin = 6*np.array([[2.], [-2.]]).astype(float)
+    bout = 6*np.array([[2.], [2.]]).astype(float)
+    node3 = make_nODE_from_parameters(Gamma, Win=Win, bin=bin, Wout=Wout, bout=bout)
+    found_model2 = Fitting(node3)
+    full_rank = rank(TS_bistable, node3)
+    print('full ranking for double parameters : ', full_rank) # the scaling of the parameters mellows the effect of the rescaling
+    pr, scaling = parameter_ranking(TS_bistable, node3)
     print("parameter ranking : ", pr, ' with rescaling : ', scaling)
