@@ -10,3 +10,5 @@ julia/
 .ipynb_checkpoints/
 
 .DS_Store
+
+data_zip/
