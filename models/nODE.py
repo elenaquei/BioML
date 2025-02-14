@@ -226,9 +226,10 @@ class nODE(nn.Module):
         dt = (self.time_interval[1] - self.time_interval[0]) / (50 * self.n_layers)
         return dt
 
-    def forward(self, x, return_features=False):
+    def forward(self, x, return_features=False, time_intervals=None):
         if return_features:
-            time_intervals = torch.linspace(self.time_interval[0], self.time_interval[1], 300)
+            if time_intervals is None:
+                time_intervals = torch.linspace(self.time_interval[0], self.time_interval[1], 300)
             integration_interval = torch.tensor(time_intervals).float().type_as(x)
         else:
             integration_interval = torch.tensor(self.time_interval).float().type_as(x)
