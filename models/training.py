@@ -126,6 +126,133 @@ class easyTrainer():
         return epoch_loss / len(data_loader)
 
 
+class maskedTrainer():
+    """
+    Given an optimizer, we write the training loop for minimizing the functional.
+    We need several hyperparameters to define the different functionals.
+
+    ***
+    -- The boolean "turnpike" indicates whether we integrate the training error over [0,T]
+    where T is the time horizon intrinsic to the model.
+    -- The boolean "fixed_projector" indicates whether the output layer is given or trained
+    -- The float "bound" indicates whether we consider L1+Linfty reg. problem (bound>0.), or
+    L2 reg. problem (bound=0.). If bound>0., then bound represents the upper threshold for the
+    weights+biases
+    ***
+    """
+
+    def __init__(self, model, optimizer, device, mask, cross_entropy=True,
+                 print_freq=10, record_freq=10, verbose=True, save_dir=None,
+                 bound=0.):
+        self.model = model
+        self.optimizer = optimizer
+        self.mask = mask
+        self.device = device
+        self.cross_entropy = cross_entropy
+        self.loss_func = nn.MSELoss()
+        self.print_freq = print_freq
+        self.record_freq = record_freq
+        self.steps = 0
+        self.save_dir = save_dir
+        self.verbose = verbose
+        # In case we consider L1-reg. we threshold the norm.
+        # Examples: M \sim T for toy datasets; 200 for mnist
+        self.threshold = bound
+
+        self.histories = {'loss_history': [],
+                          'epoch_loss_history': []}
+        self.buffer = {'loss': [], 'accuracy': []}
+        self.is_resnet = hasattr(self.model, 'num_layers')
+
+        # logging_dir='runs/our_experiment'
+        # writer = SummaryWriter(logging_dir)
+
+    def train(self, data_loader, num_epochs):
+        for epoch in range(num_epochs):
+            avg_loss = self._train_epoch(data_loader, epoch)
+            if self.verbose:
+                print("Epoch {}: {:.3f}".format(epoch + 1, avg_loss))
+
+    def _train_epoch(self, data_loader, epoch):
+        epoch_loss = 0.
+        epoch_acc = 0.
+
+        for i, (x_batch, y_batch) in enumerate(data_loader):
+            # if i == 0:
+            #     print('first data batch', x_batch[0], y_batch[0])
+            self.optimizer.zero_grad()
+            x_batch = x_batch.to(self.device)
+            y_batch = y_batch.to(self.device)
+
+            y_pred, traj = self.model(x_batch)
+            time_steps = self.model.time_steps
+            T = self.model.T
+            dt = T / time_steps
+
+            ## Classical empirical risk minimization
+
+            loss = self.loss_func(y_pred, y_batch)
+            '''loss = 0
+            for j in range(2):
+                x_i = x_batch[j]
+                y_i = y_batch[j]
+                y_pred = self.model(x_i)[0]
+                loss += torch.sum((y_pred - y_i) ** 2)
+                # loss_trainer += self.loss_func(y_pred, y_i)
+            '''
+
+            masked_loss = 0
+            for k in range(self.model.time_steps):
+                if self.model.flow.dynamics.architecture == 1:
+                    weights = self.model.flow.dynamics.fc1_time[k].weight.matmul(
+                        self.model.flow.dynamics.fc3_time[k].weight)
+                elif self.model.flow.dynamics.architecture == 0:
+                    weights = self.model.flow.dynamics.fc2_time[k].weight
+                elif self.model.flow.dynamics.architecture == 3:
+                    weights = self.model.flow.dynamics.fc2_time[k].weight
+                else:
+                    weights = self.model.flow.dynamics.fc2_time[k].weight
+                unexpected_connections = weights * (1 - self.mask)
+                masked_loss += unexpected_connections.norm(1)
+
+            loss += masked_loss
+
+            loss.backward()
+            self.optimizer.step()
+
+            epoch_loss += loss.item()
+
+            if i % self.print_freq == 0:
+                if self.verbose:
+                    print("\nIteration {}/{}".format(i, len(data_loader)))
+                    print("Loss: {:.3f}".format(loss))
+                    print("Masked loss: {:.3f}".format(masked_loss))
+
+            self.buffer['loss'].append(loss.item())
+
+            # At every record_freq iteration, record mean loss and clear buffer
+            if self.steps % self.record_freq == 0:
+                self.histories['loss_history'].append(mean(self.buffer['loss']))
+                if self.cross_entropy:
+                    self.histories['acc_history'].append(mean(self.buffer['accuracy']))
+
+                # Clear buffer
+                self.buffer['loss'] = []
+                self.buffer['accuracy'] = []
+
+                # Save information in directory
+                if self.save_dir is not None:
+                    dir, id = self.save_dir
+                    with open('{}/losses{}.json'.format(dir, id), 'w') as f:
+                        json.dump(self.histories['loss_history'], f)
+
+            self.steps += 1
+
+        # Record epoch mean information
+        self.histories['epoch_loss_history'].append(epoch_loss / len(data_loader))
+
+        return epoch_loss / len(data_loader)
+
 def weights_to_dataset(integration_time, Gamma, Win=None, bin=None, Wout=None, bout=None, batch_size=3000):
     dim = np.max(Gamma.shape)
     if Win is None:
