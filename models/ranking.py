@@ -5,7 +5,6 @@ from warnings import warn
 import numpy as np
 import matplotlib.pyplot as plt
 import networkx as nx
-from interval import interval
 
 from models.nODE import nODE, make_nODE_from_parameters
 
@@ -14,15 +13,15 @@ def infty_bound(model: nODE):
     def prod_loc(gamma, bout, Wout, interval_x):
         x_bound = np.empty([model.ODE_dim, 2])
         for i in range(model.ODE_dim):
-            sum_w = interval(0)
+            sum_w = [0,0]
             for j in range(model.ODE_dim):
-                sum_w += interval(Wout[i, j]) * interval_x
-            x_int = interval(-1 / gamma[i]) * (interval(bout[i]) + sum_w)
-            x_bound[i, 0] = x_int[0].inf
-            x_bound[i, 1] = x_int[0].sup
+                sum_w[0] += np.min(Wout[i, j] * interval_x)
+                sum_w[1] += np.max(Wout[i, j] * interval_x)
+            x_bound[i, 0] = min([-1 / gamma[i] * (bout[i] + sum_w[0]), -1 / gamma[i] * (bout[i] + sum_w[1])])
+            x_bound[i, 1] = max([-1 / gamma[i] * (bout[i] + sum_w[0]), -1 / gamma[i] * (bout[i] + sum_w[1])])
         return x_bound
 
-    tanh_bound = interval([-1, 1])
+    tanh_bound = np.array([-1, 1])
     gamma, Win, bin, Wout, bout = model.get_weights()
     infty_bound = prod_loc(gamma.detach().numpy(), bout.detach().numpy(), Wout.detach().numpy(), tanh_bound)
     return infty_bound
@@ -114,8 +113,8 @@ def fixed_point_ranking(true_model, found_model):
 
 
 def network_ranking(true_nODE: nODE, found_nODE: nODE):
-    true_network = true_nODE.adjacency_matrix()
-    found_network = found_nODE.adjacency_matrix()
+    true_network = np.abs(true_nODE.adjacency_matrix())
+    found_network = np.abs(found_nODE.adjacency_matrix())
 
     ranking_network = 1 - np.linalg.norm(true_network - found_network) / np.max([1., np.linalg.norm(true_network)])
     return np.max([0, ranking_network])
@@ -137,7 +136,7 @@ def parameter_ranking(true_nODE: nODE, found_nODE: nODE):
     gamma_F, W1_F, b1_F, W2_F, b2_F = numpify([gamma_F, W1_F, b1_F, W2_F, b2_F])
     selected_pars_T = append_local(gamma_T, norm(W1_T), norm(b1_T), norm(W2_T), b2_T)
     selected_pars_F = append_local(gamma_F, norm(W1_F), norm(b1_F), norm(W2_F), b2_F)
-    scaling = norm(selected_pars_T) / norm(selected_pars_F)
+    scaling = 1 #norm(selected_pars_T) / norm(selected_pars_F)
     ranking = max(1 - norm(+scaling * selected_pars_F - selected_pars_T) / norm(selected_pars_T),
                   1 - norm(-scaling * selected_pars_F - selected_pars_T) / norm(selected_pars_T))
     ranking = max(0, ranking)
@@ -149,8 +148,8 @@ def parameter_ranking(true_nODE: nODE, found_nODE: nODE):
 
 def rank(true_model, found_model):
     """ all parameters are supposed to be fixed in this case"""
-    rank_on_parameters = parameter_ranking(true_model, found_model)[0]
     rank_on_network = network_ranking(true_model, found_model)
+    rank_on_parameters = parameter_ranking(true_model, found_model)[0]
     rank_on_fixed_points = fixed_point_ranking(true_model, found_model)
     return [rank_on_network, rank_on_parameters, rank_on_fixed_points]
 
