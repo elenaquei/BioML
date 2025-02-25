@@ -5,9 +5,9 @@ global iter_counter = 0
 
 data_name = "dyn_bifurcating"
 
-edge_trained = []
+edge_trained = [2,4]
 
-improved = true
+improved = false
 
 # cluster used for fitting bifurcating network
 cluster = 0
@@ -119,7 +119,7 @@ function f(du, u, p, t)
     A = distribute_parameters(adj_p, indices, matsize)
 
     # calculate right-hand side of ODE
-    du[:] = -abs.(gamma).*u + abs.(b1) + abs.(wout).*tanh.(A * u + b2)
+    du[:] = -abs.(gamma).*u + abs.(b1) + abs.(wout).*tanh.(transpose(A) * u + b2)
 end
 
 function standardize_p(p)
