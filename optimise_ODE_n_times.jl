@@ -111,24 +111,29 @@ function f(du, u, p, t)
     # distribute parameters into A, gamma, b1, b2, wout used in different parts of the model equations
     adj_p = p[1:length(indices)]
     gamma = p[length(indices)+1:length(indices)+matsize[1]]
-    wout = p[length(indices)+matsize[1]+1:end]
+    b1 = p[length(indices)+matsize[1]+1:length(indices)+matsize[1]*2]
+    b2 = p[length(indices)+matsize[1]*2+1:length(indices)+matsize[1]*3]
+    wout = p[length(indices)+matsize[1]*3+1:end]
 
     # distribute parameters according to given adjacency matrix
     A = distribute_parameters(adj_p, indices, matsize)
 
     # calculate right-hand side of ODE
-    du[:] = -abs.(gamma).*u + abs.(wout).*tanh.(transpose(A) * u)
+    du[:] = -abs.(gamma).*u + abs.(b1) + abs.(wout).*tanh.(transpose(A) * u + b2)
 end
 
 function standardize_p(p)
     adj_p = p[1:length(indices)]
     gamma = p[length(indices)+1:length(indices)+matsize[1]]
-    wout = p[length(indices)+matsize[1]+1:end]
+    b1 = p[length(indices)+matsize[1]+1:length(indices)+matsize[1]*2]
+    b2 = p[length(indices)+matsize[1]*2+1:length(indices)+matsize[1]*3]
+    wout = p[length(indices)+matsize[1]*3+1:end]
 
     gamma = abs.(gamma)
+    b1 = abs.(b1)
     wout = abs.(wout)
 
-    return [adj_p; gamma; wout]
+    return [adj_p; gamma; b1; b2; wout]
 end
 
 # callback function to monitor training
@@ -143,67 +148,64 @@ callback = function (state, l; doplot = false)
         println("Iteration: $iter_counter")
         println("Current loss: ", l)
     end
-
-    # if iter_counter % 100 == 0
-    #     println("Iteration: $iter_counter")
-    #     println("Current loss: ", l)
-    # end
     return false
 end
 
-global min_loss = 100000
-
 # time span
 tspan = (0.0, 1.0)
-p = rand(length(indices) + 2*size(adj)[1])
+p = rand(length(indices) + 4*size(adj)[1])
 prob = ODEProblem(f, u0, tspan, p)
 sol = solve(prob, Tsit5())
 
 cost_function = build_loss_objective(prob, Tsit5(), L2Loss(tdat,dat),
                                      Optimization.AutoForwardDiff(), reg,
                                      verbose = false, trajectories=N)
+                                    
+for n in 1:25
+    global iter_counter = 0
+    global min_loss = 100000
+    pinit = rand(length(indices) + 4*size(adj)[1])
+    global loss_vec = [cost_function(pinit)]
 
-pinit = rand(length(indices) + 2*size(adj)[1])
-global loss_vec = [cost_function(pinit)]
+    lb = -10*ones(length(pinit))
+    ub = 10*ones(length(pinit))
 
-lb = -10*ones(length(pinit))
-ub = 10*ones(length(pinit))
+    optprob = Optimization.OptimizationProblem(cost_function, pinit, lb=lb, ub=ub)
+    # optsol = solve(optprob, OptimizationOptimisers.Adam(0.2), callback=callback)
 
-optprob = Optimization.OptimizationProblem(cost_function, pinit, lb=lb, ub=ub)
-# optsol = solve(optprob, OptimizationOptimisers.Adam(0.01), callback=callback)
+    @time optsol = solve(optprob, BBO_adaptive_de_rand_1_bin_radiuslimited(), maxiters = 100000,
+    maxtime = 600.0, callback=callback)
 
-optsol = solve(optprob, BBO_adaptive_de_rand_1_bin_radiuslimited(), maxiters = 100000,
-maxtime = 120.0, callback=callback)
+    bestp = optsol.u
+    bestp = standardize_p(bestp)
+    println("Best parameters: ", bestp)
 
-bestp = optsol.u
-bestp = standardize_p(bestp)
-println("Best parameters: ", bestp)
-
-# sorting naming for saving best parameters
-if cluster >= 0
-    if edge_trained !=[]
-        if improved == true
-            filenm = data_path * data_name * "/no_b_fit_cluster"*string(cluster)*"_"*string(edge_trained[1]-1)*"_"*string(edge_trained[2]-1)*"_improved.txt"
+    # sorting naming for saving best parameters
+    if cluster >= 0
+        if edge_trained !=[]
+            if improved == true
+                filenm = data_path * data_name * "/fit_cluster"*string(cluster)*"_"*string(edge_trained[1]-1)*"_"*string(edge_trained[2]-1)*"_improved"*string(n)*".txt"
+            else
+                filenm = data_path * data_name * "/fit_cluster"*string(cluster)*"_"*string(edge_trained[1]-1)*"_"*string(edge_trained[2]-1)*"_"*string(n)*".txt"
+            end
         else
-            filenm = data_path * data_name * "/no_b_fit_cluster"*string(cluster)*"_"*string(edge_trained[1]-1)*"_"*string(edge_trained[2]-1)*".txt"
+            filenm = data_path * data_name * "/fit_cluster" * string(cluster) * "_"*string(n)*".txt"
         end
     else
-        filenm = data_path * data_name * "/no_b_fit_cluster" * string(cluster) * ".txt"
-    end
-else
-    if edge_trained !=[]
-        if improved == true
-            filenm = data_path * data_name * "/no_b_fit_" * string(edge_trained[1]-1) * "_"*string(edge_trained[2]-1) * "_improved.txt"
+        if edge_trained !=[]
+            if improved == true
+                filenm = data_path * data_name * "/fit_" * string(edge_trained[1]-1) * "_"*string(edge_trained[2]-1) * "_improved"*string(n)*".txt"
+            else
+                filenm = data_path * data_name * "/fit_" * string(edge_trained[1]-1) * "_"*string(edge_trained[2]-1) * "_"*string(n)*".txt"
+            end
         else
-            filenm = data_path * data_name * "/no_b_fit_" * string(edge_trained[1]-1) * "_"*string(edge_trained[2]-1) * ".txt"
+            filenm = data_path * data_name * "/fit_"*string(n)*".txt"
         end
-    else
-        filenm = data_path * data_name * "/no_b_fit.txt"
     end
-end
 
-io = open(filenm, "w") do io
-    for x in bestp
-        println(io, x)
+    io = open(filenm, "w") do io
+        for x in bestp
+            println(io, x)
+        end
     end
 end

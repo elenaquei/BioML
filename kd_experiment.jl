@@ -11,7 +11,7 @@ improved = true
 adj = matread(data_path*data_name*"/net.mat")["Aref"]
 
 global kd = ones(size(adj,1))
-global kd[2] = 10.0
+global kd[3] = 10.0
 
 if edge_trained != []
       if improved == true
@@ -20,7 +20,7 @@ if edge_trained != []
           end
           print("gae_results/"*data_name*string(edge_trained[1]-1)*"_"*string(edge_trained[2]-1)*".mat")
           adj = matread("gae_results/"*data_name*"_"*string(edge_trained[1]-1)*"_"*string(edge_trained[2]-1)*".mat")["inferred_adj"]
-          adj = Float64.(isnan.(adj))+Float64.(adj.>0.5)
+          adj = Float64.(isnan.(adj))+Float64.(adj.>0.9)
       else
           adj[edge_trained[1],edge_trained[2]] = 0
       end
@@ -59,7 +59,7 @@ prob1 = ODEProblem(f, u0, [0.0,1.0], a)
 sol1 = solve(prob1)
 u = reduce(hcat, sol1.u)
 
-ind = 3
+ind = 5
 # Plotting the data
 scatter(tdat, dat[ind, :], label="Data", markersize=6, linewidth=2, legend=:topright)
 

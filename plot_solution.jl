@@ -1,12 +1,12 @@
-a = open("data/dyn_bifurcating/fit_cluster0.txt") do f
+a = open("data/dyn_bifurcating/fit_cluster0_2_4_improved.txt") do f
     readlines(f) |> (s->parse.(Float64, s))
 end
 
 data_name = "dyn_bifurcating"
 
-edge_trained = []
+edge_trained = [3,5]
 
-improved = false
+improved = true
 
 adj = matread(data_path*data_name*"/net.mat")["Aref"]
 
@@ -17,7 +17,7 @@ if edge_trained != []
           end
           print("gae_results/"*data_name*string(edge_trained[1]-1)*"_"*string(edge_trained[2]-1)*".mat")
           adj = matread("gae_results/"*data_name*"_"*string(edge_trained[1]-1)*"_"*string(edge_trained[2]-1)*".mat")["inferred_adj"]
-          adj = Float64.(isnan.(adj))+Float64.(adj.>0.5)
+          adj = Float64.(isnan.(adj))+Float64.(adj.>0.9)
       else
           adj[edge_trained[1],edge_trained[2]] = 0
       end
@@ -56,20 +56,23 @@ prob1 = ODEProblem(f, u0, [0.0,1.0], a)
 sol1 = solve(prob1)
 u = reduce(hcat, sol1.u)
 
-ind = 3
+ind = 5
 # Plotting the data
-scatter(tdat, dat[ind, :], label="Data", markersize=6, linewidth=2, legend=:topright)
+h =scatter(tdat, dat[ind, :], label="Data", markersize=6, linewidth=2, legend=:topright)
 
 # Plotting the solution
-plot!(sol1.t, u[ind, :], label="Simulation", linewidth=3, color=:black)
+h = plot!(sol1.t, u[ind, :], label="Simulation", linewidth=3, color=:black)
 
 # Customize the plot for publication quality
-plot!(xlabel="Pseudotime", ylabel="Gene Expression", title="Gene "* string(ind), 
+h = plot!(xlabel="Pseudotime", ylabel="Gene Expression", title="Gene "* string(ind), 
       legendfontsize=12, tickfontsize=10, 
       guidefontsize=14, titlefontsize=16)
 
 # Adjust plot size
-plot!(size=(600, 400))  # Small size for publication, adjust as needed
+h = plot!(size=(600, 400))  # Small size for publication, adjust as needed
+display(h)
+
+p_adj =  distribute_parameters(a[1:length(indices)], indices, matsize)
 
 # Optional: Save the plot as a high-quality image
 # savefig("plot.png", dpi=300)
