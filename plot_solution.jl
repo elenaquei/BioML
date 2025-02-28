@@ -1,10 +1,10 @@
-a = open("data/dyn_bifurcating/fit_cluster0_2_4_improved.txt") do f
+a = open("data/dyn_bifurcating/fit_cluster0.txt") do f
     readlines(f) |> (s->parse.(Float64, s))
 end
 
 data_name = "dyn_bifurcating"
 
-edge_trained = [3,5]
+edge_trained = []
 
 improved = true
 
@@ -50,7 +50,7 @@ function f(du, u, p, t)
   
       # calculate right-hand side of ODE
       du[:] = -abs.(gamma).*u + abs.(b1) + abs.(wout).*tanh.(transpose(A) * u + b2)
-  end
+end
 
 prob1 = ODEProblem(f, u0, [0.0,1.0], a)
 sol1 = solve(prob1)

@@ -3,7 +3,7 @@ correct = 0;
 incorrect = 0;
 for k=1:20
     % Create directed graph
-    load(['data\dyn_bifurcating\no_b_fit_cluster0_2_4_improved',num2str(k),'.mat'])
+    load(['data\dyn_bifurcating\fit_cluster0_2_4_improved',num2str(k),'.mat'])
     A = Aref;
     
     G = digraph(A);
