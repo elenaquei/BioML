@@ -1,4 +1,4 @@
-
+% code to plot output of GAE against original graph
 load("gae_results\dyn_bifurcating_2_4.mat")
 
 adj1 = double(isnan(inferred_adj));

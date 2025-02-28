@@ -5,6 +5,8 @@ global iter_counter = 0
 
 data_name = "dyn_bifurcating"
 
+# if filled in, will assume this edge has been trained on with the GAE (imputed if improved = false and
+# improved if improved = true). If left empty, will assume that it is desired to fit the ODE model on the original graph.
 edge_trained = [3,5]
 
 improved = false

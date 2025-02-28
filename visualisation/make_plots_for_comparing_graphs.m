@@ -1,7 +1,10 @@
 load('data\dyn_bifurcating\signed_net');
+
 correct = 0;
 incorrect = 0;
-for k=1:20
+
+% load all fits
+for k=1:25
     % Create directed graph
     load(['data\dyn_bifurcating\fit_cluster0_2_4_improved',num2str(k),'.mat'])
     A = Aref;
@@ -34,6 +37,7 @@ for k=1:20
 
     colormap([negativeColor; positiveColor]);
 
+    % check how many edges are correct in the loaded graph
     for i = 1:length(A(1,:))
         for j=1:length(A(1,:))
             if true_net(i,j) ~= 0 && A(i,j) ~=0
