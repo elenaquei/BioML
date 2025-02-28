@@ -1,10 +1,12 @@
 # BioML
 
-In this project, we present an application of graph neural networks for constructing mechanistic models for time-dependent gene expression. Our result highlights not only the flexibility of GAEs, but also their limitations, appearing in the form of spurious edges. Furthermore, we demonstrate how a good fit of the data does not relate to a good representation of the underlying model, thus highlighting the importance of additional testing on fitted models, such as the presented knock-down experiments
+In this project, we present an application of graph neural networks for constructing mechanistic models for time-dependent gene expression. Our result highlights not only the flexibility of GAEs, but also their limitations, appearing in the form of spurious edges. Furthermore, we demonstrate how a good fit of the data does not relate to a good representation of the underlying model, thus highlighting the importance of additional testing on fitted models, such as the presented knock-down experiments.
+
+We have used BoolODE to generate synthetic data for this project (https://github.com/Murali-group/BoolODE). To use the code in this pipeline, the full output of BoolODE should be put into a subdirectory with the name of the simulated model in the data directory.
 
 The github contains all files necessary to run the code and generate the figures in the manuscript. Specifically:
 
-In the main directory:
+# In the main directory:
 
 GAE_improving_network.ipynb: Includes the code needed to run our GAE on a given network, iteratively removing one edge from the network and outputting + saving the predicted adjacency matrices for these cases.
 
@@ -12,7 +14,7 @@ optimise_ODE.jl: Contains all code necessary to optimise the ODE model based on 
 
 kd_experiment.jl: Contains the code necessary to run the knock-down experiments.
 
-In the visualisation directory:
+# In the visualisation directory:
 
 get_statistics_gae_results.m: contains all code necessary to get the graph plots presented in Figure 4 of the manuscript, along with the data to construct the bar graphs in figure 5 of the manuscript.
 
@@ -22,7 +24,7 @@ plot_solution.jl: contains the code necessary to plot the results of the ODE mod
 
 plot2graphs.jl: contains the code to plot two graphs: the input to the GAE and the output of the GAE using red edges to indicate added edges.
 
-In the utils directory:
+# In the utils directory:
 
 boolODE_data_to_pyg_data.py: contains code to convert the output of BoolODE to data compatible with pytorch geometric.
 
