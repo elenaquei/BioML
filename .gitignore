@@ -1,4 +1,14 @@
-
 *.png
-
 .idea/
+output/
+plots/
+*.mat
+*.pyc
+
+julia/
+
+.ipynb_checkpoints/
+
+.DS_Store
+
+data_zip/
