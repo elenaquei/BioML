@@ -1,6 +1,5 @@
 % this script loads data and constructs the graph plots used to visualise the performance of the GAE in Figure 3 of the paper.
 % This script assumes that the output files of the GAE are deposited in a folder output/[network_name]/
-% The 
 network_name = 'dyn_bifurcating_converging';
 
 % in some cases, the size of the reference network is bigger than necessary. To account for this, sometimes manually constructing the adjacency matrix is necessary.
@@ -90,7 +89,7 @@ function [Amean, Apred, Ainvpred, N_added, rank_list] = get_statistics(Aref, net
     for k=1:length(Aref(1,:))
         for j=1:length(Aref(:,2))
             if Aref(k,j) ~= 0
-                
+
                 % load network per GAE training
                 load(['gae_results/',network_name,'_',num2str(k-1),'_',num2str(j-1),'.mat'])
                 inferred_adj(isnan(inferred_adj)) = 0;
