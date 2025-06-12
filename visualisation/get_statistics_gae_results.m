@@ -1,15 +1,10 @@
+% this script loads data and constructs the graph plots used to visualise the performance of the GAE in Figure 3 of the paper.
+% This script assumes that the output files of the GAE are deposited in a folder output/[network_name]/
+% The 
 network_name = 'dyn_bifurcating_converging';
 
-if size(network_name) == size('dyn_trifurcating_new')
-    if network_name == 'dyn_trifurcating_new'
-        dataname = 'dyn_trifurcating';
-    else
-        dataname = network_name;
-    end
-else
-    dataname = network_name;
-end
-
+% in some cases, the size of the reference network is bigger than necessary. To account for this, sometimes manually constructing the adjacency matrix is necessary.
+% In all other cases, directly taking the data from the 
 if size(network_name) == size('dyn_linear-long')
     if network_name == 'dyn_linear-long'
         load('gae_results/dyn_linear-long_1_2.mat');
@@ -30,34 +25,38 @@ else
     Aref = read_ref_network(dataname);
 end
 
+% save reference network to use later (e.g. to construct the data file needed to optimise ODE parameters)
 save(['data/',dataname,'/net.mat'],"Aref");
 
+% compute statistics for plotting
 [Amean, Apred, Ainvpred, N_added, rank_list] = get_statistics(Aref,network_name);
 
+% G2: indicates how well true edges are recovered
+% G1: indicates edges that are often recovered, but are not in the true network
 G2 = digraph(Apred);
 G1 = digraph(double(Amean>0.5));
 
-% w = 0.1 + 5*(G2.Edges.Weight-min(G2.Edges.Weight))/(max(G2.Edges.Weight)-min(G2.Edges.Weight));
-
 tot = length(Apred(1,:))^2-sum(sum(Aref));
 
+% set weights for each edge of G2
 w = 0.1 + 5*(tot-G2.Edges.Weight)/tot;
 
 figure
 A1 = adjacency(G1);
 A2 = adjacency(G2);
-% Extract edges
-[s1, t1] = find(A1); % Edges from G1
-[s2, t2] = find(A2); % Edges from G2
 
-% Combine edges into a single set
+% extract edges to plot from G2 and G1
+[s1, t1] = find(A1);
+[s2, t2] = find(A2);
+
+% combine edges into a single set
 s = [s1; s2];
 t = [t1; t2];
 
-% Create a new graph that includes all edges
+% create a new graph that includes all edges
 G = digraph(s, t);
 
-% Plot the graph
+% plot the graph
 h = plot(G, 'NodeFontSize',14,'NodeColor','k','MarkerSize',10, 'Layout', 'force', 'EdgeAlpha',0.4);
 
 % Highlight edges
@@ -77,6 +76,7 @@ hold off
 
 print([network_name,'.png'],'-dpng','-r300');
 
+% method to compute various statistics for the inferred networks
 function [Amean, Apred, Ainvpred, N_added, rank_list] = get_statistics(Aref, network_name)
     N = length(Aref(1,:));
 
@@ -90,6 +90,7 @@ function [Amean, Apred, Ainvpred, N_added, rank_list] = get_statistics(Aref, net
     for k=1:length(Aref(1,:))
         for j=1:length(Aref(:,2))
             if Aref(k,j) ~= 0
+                
                 % load network per GAE training
                 load(['gae_results/',network_name,'_',num2str(k-1),'_',num2str(j-1),'.mat'])
                 inferred_adj(isnan(inferred_adj)) = 0;
