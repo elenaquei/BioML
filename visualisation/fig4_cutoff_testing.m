@@ -5,6 +5,8 @@ auroc_vec = zeros(length(threshold),1);
 
 % repeat for each possible threshold
 for j=1:length(threshold)
+
+% set paths in which to find the output of the GAE
 gae_pth = 'new_output\';
 
 network = 'dyn_linear-long';
@@ -13,7 +15,7 @@ pattern = fullfile(gae_pth,[network, '*']);
 
 files = dir(pattern);
 
-% Step 2: Filter out those that have extra text before the first underscore after the prefix
+% filter out those that have extra text before the first underscore after the prefix
 if strcmp(network,'dyn_bifurcating') || strcmp(network, 'dyn_linear')
     filteredFiles = {};
     for k = 1:length(files)
