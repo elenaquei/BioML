@@ -1,213 +1,147 @@
-using DifferentialEquations, RecursiveArrayTools, Plots, DiffEqParamEstim
-using Optimization, ForwardDiff, OptimizationOptimisers, SparseArrays, MAT, CSV, DataFrames, Statistics, OptimizationBBO
+using DifferentialEquations
+using Optimization, OptimizationOptimisers
+using Zygote
+using SciMLSensitivity
+using ComponentArrays
+using MAT
+using Plots
+using OptimizationBBO
 
-global iter_counter = 0
+# load in data for optimisation. This file should contain three fields:
+#   Aa: reference activating adjacency matrix
+#   Ai: reference inhibiting adjacency matrix
+#   data: time series data to which model is fitted
+# notably: Aa and Ai are combined to form one adjacency matrix in this script, and therefore are not used separately. Moreover, multiple data files can be given as input,
+# which correspond to different trajectories in the data. Please refer to the parameter settings below to set this up for a different experiment.
+#
+# to save the output, the folder opts/ should exist in the working directory
+netfile = matread("gae_new_opt_data.mat")
 
-data_name = "dyn_bifurcating"
+# load in data from output files (activating network, inhibiting network and expression of all genes)
+const Aa_ref = netfile["Aa"]
+const Ai_ref = netfile["Ai"]
+const A_ref = Aa_ref + Ai_ref
 
-# if filled in, will assume this edge has been trained on with the GAE (imputed if improved = false and
-# improved if improved = true). If left empty, will assume that it is desired to fit the ODE model on the original graph.
-edge_trained = [3,5]
+# here, 2 trajectories are loaded (this can be adjusted by hand)
+const data0  = netfile["data0"]
+const data1 = netfile["data1"]
 
-improved = false
+# data is constructed from the two input files manually (this can be adjusted if a different setting with more/fewer trajectories is used)
+const data = [data0,data1]
 
-# cluster used for fitting bifurcating network
-cluster = 0
+const N = length(Aa_ref[:,1])
+const xsize = sum(Aa_ref.>0) + sum(Ai_ref.>0)
 
-function get_indices(A, threshold)
-    indices = []
-    print(typeof(adj))
-    print(size(A))
-    for i in 1:size(A)[1]
-        for j in 1:size(A)[2]
-            if abs(A[i,j]) > threshold
-                push!(indices, (i,j))
-            end
-        end
+# set time span to simulate and time steps on which data is available (SET MANUALLY)
+tspan =  (0.1f0, 1.0f0)
+const tsteps = 0.1f0:0.1f0:0.9f0
+
+# set number of simulations (according to data available)
+const nsims = 2
+
+# function to recover adjacency matrices from input data
+function make_matrices(x)
+
+    idxs = findall(!iszero, A_ref)
+    Aa_vals = map(xi -> max(xi, 0.0), x)
+    Ai_vals = map(xi -> max(-xi, 0.0), x)
+
+    # use comprehensions to fill in the adjacency matrices. Notably, this definition does not mutate arrays, and therefore this can also be used in the case that automatic differentiation is desired
+    Aa_new = [i in idxs ? Aa_vals[findfirst(isequal(i), idxs)] : 0.0 for i in CartesianIndices(A_ref)]
+    Ai_new = [i in idxs ? Ai_vals[findfirst(isequal(i), idxs)] : 0.0 for i in CartesianIndices(A_ref)]
+
+    return reshape(Aa_new, size(A_ref)), reshape(Ai_new, size(A_ref))
+end
+
+# ODE function definition
+function grnODE(du, u, p, t)
+    # set parameters: τ is the time scale, p is distributed over the activating and inhibiting matrices, and e is internal stimulation
+    e = abs.(p[length(p)-N:length(p)-1])
+    τ = abs.(p[length(p)])
+    param = p[1:length(p)-N-1]
+    
+    # make matrices and compute ODE function at given point u
+    (Aa,Ai) = make_matrices(param)
+
+    # compute right-hand side of ODE
+    act(x,y) = x ./ (1 .+ x .+ y)
+    du[:] = τ*(-u + act.(e + transpose(Aa)*u.^3,transpose(Ai)*u.^3))
+end
+
+# loss function
+function loss_function(θ,_)
+
+    # distribute parameters θ into initial conditions and model parameters
+    ics = reshape(abs.(θ[1:nsims*N]), (N, nsims))
+    p = θ[nsims*N+1:end]
+
+    l = 0
+
+    # first, we compute the L2 loss between data an model simulations
+    for k=1:nsims
+        prob = ODEProblem(grnODE,ComponentVector(p=ics[:,k]),tspan,ComponentVector(p = p))
+        sol = solve(prob, Tsit5(),saveat=tsteps, sensealg=InterpolatingAdjoint(autojacvec=ZygoteVJP()))
+        u = reduce(hcat,sol.u)
+        l += sum(abs2, u .- data[k][:,2:end])
     end
-    return indices
+    
+    # then, we add L1 difference between current initial conditions and the desired ICs from the data
+    l += 10*maximum(abs.(ics[:,1] .- data[1][:,1]))
+    l += 10*maximum(abs.(ics[:,2] .- data[2][:,1]))
+
+    # finally, we add the L1 loss on all parameter values (not initial conditions)
+    l += 0.001*sum(abs.(p))
+    return l
 end
 
-data_path = "data/"
+callback = function (state, l; doplot = false) #callback function to observe training
 
-dat = Matrix(CSV.read(data_path * data_name * "/ExpressionData.csv", DataFrame, delim=","))[:,2:end]
-
-tdat = Matrix(CSV.read(data_path * data_name * "/PseudoTime.csv", DataFrame, delim=","))[:,2]
-
-if data_name == "dyn_bifurcating"
-    cl = Matrix(CSV.read("data/dyn_bifurcating/clusters.csv", DataFrame, delim=","))
-    cl = vec([0; cl])
-
-    dat0 = Float64.(dat[:,cl.==0])
-    dat1 = Float64.(dat[:,cl.==1])
-    t0 = Float64.(tdat[cl.==0])
-    t1 = Float64.(tdat[cl.==1])
-
-    sorted_indices = sortperm(t0)
-    t0= Float64.(t0[sorted_indices])
-    dat0 = Float64.(dat0[:, sorted_indices])
-
-    sorted_indices = sortperm(t1)
-    t1= Float64.(t1[sorted_indices])
-    dat1 = Float64.(dat1[:, sorted_indices])
-     
-    u0_0 = mean(dat0[:,t0.<0.05], dims=2)
-    u0_1 = mean(dat1[:,t1.<0.05], dims=2)
-
-    if cluster == 0
-        tdat = t0
-        dat = dat0
-        u0 = u0_0
-    else
-        tdat = t1
-        dat = dat1
-        u0 = u0_1
-    end
-else
-    tdat = Float64.(tdat)
-    dat = Float64.(dat)
-    u0 = mean(dat[:,tdat.<0.05], dims=2)
-end
-
-adj = matread(data_path*data_name*"/net.mat")["Aref"]
-
-if edge_trained != []
-    if improved == true
-        if data_name == "dyn_trifurcating_new"
-            data_name = "dyn_trifurcating"
-        end
-        print("gae_results/"*data_name*string(edge_trained[1]-1)*"_"*string(edge_trained[2]-1)*".mat")
-        adj = matread("gae_results/"*data_name*"_"*string(edge_trained[1]-1)*"_"*string(edge_trained[2]-1)*".mat")["inferred_adj"]
-        adj = Float64.(isnan.(adj))+Float64.(adj.>0.9)
-    else
-        adj[edge_trained[1],edge_trained[2]] = 0
-    end
-end
-
-global indices = get_indices(adj, 0.8)
-
-global matsize = (size(adj)[1], size(adj)[2])
-
-N = 3
-
-function distribute_parameters(params, indices, size)
-    # Construct the matrix without mutation
-    A = zeros(eltype(params), matsize)
-
-    for (i, p) in zip(indices, params)
-        A[i[1],i[2]] = p
+    # keep track of the amount of iterations already optimized for
+    global iters += 1
+    if iters % 10000 == 0
+        display(string(iters)*" iterations...")
     end
 
-    return A
-end
-
-function reg(p)
-    reg_loss = 5*sum(abs.(p))
-    # println(typeof(p))
-    reg_loss = reg_loss + 10000*sum(abs.(f(zeros(eltype(p),7),dat[:,end],p,0)))
-    return reg_loss
-end
-
-function f(du, u, p, t)
-
-    # distribute parameters into A, gamma, b1, b2, wout used in different parts of the model equations
-    adj_p = p[1:length(indices)]
-    gamma = p[length(indices)+1:length(indices)+matsize[1]]
-    b1 = p[length(indices)+matsize[1]+1:length(indices)+matsize[1]*2]
-    b2 = p[length(indices)+matsize[1]*2+1:length(indices)+matsize[1]*3]
-    wout = p[length(indices)+matsize[1]*3+1:end]
-
-    # distribute parameters according to given adjacency matrix
-    A = distribute_parameters(adj_p, indices, matsize)
-
-    # calculate right-hand side of ODE
-    du[:] = -abs.(gamma).*u + abs.(b1) + abs.(wout).*tanh.(transpose(A) * u + b2)
-end
-
-function standardize_p(p)
-    adj_p = p[1:length(indices)]
-    gamma = p[length(indices)+1:length(indices)+matsize[1]]
-    b1 = p[length(indices)+matsize[1]+1:length(indices)+matsize[1]*2]
-    b2 = p[length(indices)+matsize[1]*2+1:length(indices)+matsize[1]*3]
-    wout = p[length(indices)+matsize[1]*3+1:end]
-
-    gamma = abs.(gamma)
-    b1 = abs.(b1)
-    wout = abs.(wout)
-
-    return [adj_p; gamma; b1; b2; wout]
-end
-
-# callback function to monitor training
-callback = function (state, l; doplot = false) 
-    global iter_counter += 1
-   
-    # save loss to loss_vec
-    push!(loss_vec,l)
-
-    if l < min_loss
-        global min_loss = l
-        println("Iteration: $iter_counter")
-        println("Current loss: ", l)
+    # since differential evolution takes many steps (many of which do not improve the objective), we only print out the loss value if it has improved
+    if l < minimum(loss_vec)
+        display(l)
     end
+
+    # push current loss value to loss vector
+    push!(loss_vec, l)
     return false
 end
 
-# time span
-tspan = (0.0, 1.0)
-p = rand(length(indices) + 4*size(adj)[1])
-prob = ODEProblem(f, u0, tspan, p)
-sol = solve(prob, Tsit5())
 
-cost_function = build_loss_objective(prob, Tsit5(), L2Loss(tdat,dat),
-                                     Optimization.AutoForwardDiff(), reg,
-                                     verbose = false, trajectories=N)
-                                    
-for n in 1:25
-    global iter_counter = 0
-    global min_loss = 100000
-    pinit = rand(length(indices) + 4*size(adj)[1])
-    global loss_vec = [cost_function(pinit)]
+# this code runs 10 individual fits, but can be adjusted as needed
+for k=1:10
 
-    lb = -10*ones(length(pinit))
-    ub = 10*ones(length(pinit))
+    # construct optimization function
+    optf = OptimizationFunction(loss_function, Optimization.AutoZygote())
 
-    optprob = Optimization.OptimizationProblem(cost_function, pinit, lb=lb, ub=ub)
-    # optsol = solve(optprob, OptimizationOptimisers.Adam(0.2), callback=callback)
+    # set initial value for parameters
+    θ0 = rand(N*nsims+xsize+N+1)
+    θ0[1:N] .= data[1][:,1]
+    θ0[N+1:2*N] .= data[2][:,2]
+    θ0[nsims*N+1:end] .= 2*rand(xsize+N+1).-1
 
-    @time optsol = solve(optprob, BBO_adaptive_de_rand_1_bin_radiuslimited(), maxiters = 100000,
-    maxtime = 600.0, callback=callback)
+    # initialise vector of losses
+    global loss_vec = [100.0]
+    global iters = 0
 
-    bestp = optsol.u
-    bestp = standardize_p(bestp)
-    println("Best parameters: ", bestp)
+    # build the optimization problem, lower and upper bounds for parameters are set here
+    optprob = OptimizationProblem(optf, θ0, lb=-10*ones(length(θ0)),ub=10*ones(length(θ0)), callback=callback)
 
-    # sorting naming for saving best parameters
-    if cluster >= 0
-        if edge_trained !=[]
-            if improved == true
-                filenm = data_path * data_name * "/fit_cluster"*string(cluster)*"_"*string(edge_trained[1]-1)*"_"*string(edge_trained[2]-1)*"_improved"*string(n)*".txt"
-            else
-                filenm = data_path * data_name * "/fit_cluster"*string(cluster)*"_"*string(edge_trained[1]-1)*"_"*string(edge_trained[2]-1)*"_"*string(n)*".txt"
-            end
-        else
-            filenm = data_path * data_name * "/fit_cluster" * string(cluster) * "_"*string(n)*".txt"
-        end
-    else
-        if edge_trained !=[]
-            if improved == true
-                filenm = data_path * data_name * "/fit_" * string(edge_trained[1]-1) * "_"*string(edge_trained[2]-1) * "_improved"*string(n)*".txt"
-            else
-                filenm = data_path * data_name * "/fit_" * string(edge_trained[1]-1) * "_"*string(edge_trained[2]-1) * "_"*string(n)*".txt"
-            end
-        else
-            filenm = data_path * data_name * "/fit_"*string(n)*".txt"
-        end
-    end
+    # solve optimization problem using DE/1/rand/bin, a differential evolution algorithm. maximum iterations can be adjusted as needed
+    result = Optimization.solve(optprob, BBO_adaptive_de_rand_1_bin_radiuslimited(), maxiters = 200000, callback=callback)
+    θbest = result.u
 
-    io = open(filenm, "w") do io
-        for x in bestp
-            println(io, x)
-        end
-    end
+    # get fitted ICs and model parameters from the result of the optimization problem
+    ics = reshape(abs.(θbest[1:nsims*N]), (N, nsims))
+    p = θbest[nsims*N+1:end]
+
+    # make adjacency matrices for simple interpretation of results, and save all parameters to a .mat file for further processing
+    (Aa,Ai) = make_matrices(p)
+    mdic = Dict("pbest"=>θbest,"Aa"=>Aa,"Ai"=>Ai)
+    matwrite("opts/opt_hill_gae_"*string(k)*".mat",mdic)
 end
