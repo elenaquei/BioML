@@ -8,11 +8,11 @@ The github contains all files necessary to run the code and generate the figures
 
 # In the main directory:
 
-GAE_improving_network.ipynb: Includes the code needed to run our GAE on a given network, iteratively removing one edge from the network and outputting + saving the predicted adjacency matrices for these cases.
+GAE_improving_network.ipynb: Includes the code needed to run our GAE on a given network, iteratively removing one edge from the network and outputting + saving the predicted adjacency matrices for these cases. This code is used to generate the GRN inference results presented in Figures 3 and 4 of the paper.
 
-optimise_ODE.jl: Contains all code necessary to optimise the ODE model based on the improved graph (or any other desired graph structure) and given data. In the case that data from the bifurcating graph is given, the data from one of the two trajectories is used.
+optimise_ODE.jl: Contains all code necessary to optimise the ODE model based on the improved graph (or any other desired graph structure) and given data. Output is saved to a .mat file. This code is used to generate Figure 6B (middle) in the paper.
 
-kd_experiment.jl: Contains the code necessary to run the knock-down experiments.
+kd_experiment.jl: Contains the code necessary to run the knock-down experiments, loading information from the .mat file. This code is used to generate Figure 6B (right) in the paper.
 
 # In the visualisation directory:
 
