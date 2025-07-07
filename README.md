@@ -16,18 +16,12 @@ kd_experiment.jl: Contains the code necessary to run the knock-down experiments,
 
 # In the visualisation directory:
 
-get_statistics_gae_results.m: contains all code necessary to get the graph plots presented in Figure 4 of the manuscript, along with the data to construct the bar graphs in figure 5 of the manuscript.
+fig3_get_statistics_gae_results.m: contains the code for generating the graph plots in Figure 3 of the manuscript provided output data from the GAE is available for all edges in the original graph.
 
-make_plots_for_comparing_graphs.m: contains the code necessary for running the analysis on multiple fits of the ODE model (including statistics discussed in Chapter 3).
+fig3_parameter_tuning_visualisation.m: contains the code for the visualisation of the results for the hyperparameter sweep performed for the GAE.
 
-plot_solution.jl: contains the code necessary to plot the results of the ODE model (used in Figure 6 of the manuscript).
-
-plot2graphs.jl: contains the code to plot two graphs: the input to the GAE and the output of the GAE using red edges to indicate added edges.
+fig4_ROC_plots.m: contains the code to plot the ROC curves in Figure 4 of the manuscript for a given network.
 
 # In the utils directory:
 
 boolODE_data_to_pyg_data.py: contains code to convert the output of BoolODE to data compatible with pytorch geometric.
-
-characterise_simulations.ipynb: contains all code for splitting up the simulation of the bifurcating graph into two distinct trajectories.
-
-extract_adjacency.jl: contains code to convert the txt output files of plot_solution.jl to mat files used in the visualisation functions.
